@@ -5,6 +5,7 @@ import { Testimonials } from "@/components/landing/testimonials";
 import { PricingSection } from "@/components/landing/pricing";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { Footer } from "@/components/landing/footer";
+import { ScrollToTop } from "@/components/landing/scroll-to-top";
 
 export default function LandingPage() {
   return (
@@ -18,6 +19,7 @@ export default function LandingPage() {
         <PricingSection />
       </main>
       <Footer />
+      <ScrollToTop />
     </div>
   );
 }

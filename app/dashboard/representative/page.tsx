@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useWebSocket } from "@/app/hooks/useWebSocket";
-import { apiClient } from "@/app/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
 import { ErrorBoundary } from "@/components/error-boundary";
 import {

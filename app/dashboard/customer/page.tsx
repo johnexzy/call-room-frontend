@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useWebSocket } from '@/app/hooks/useWebSocket';
-import { apiClient } from '@/app/lib/api-client';
+import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import {
   Card,

@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import Cookies from 'js-cookie';
 
 export function useWebSocket(namespace: string = '') {
   const socket = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = Cookies.get('token');
+
     
     socket.current = io(`http://localhost:5200/${namespace}`, {
-      auth: {
-        token: `Bearer ${token}`,
+      extraHeaders: {
+        Authorization: `Bearer ${token}`,
       },
     });
 

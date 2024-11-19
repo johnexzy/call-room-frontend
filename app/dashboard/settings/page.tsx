@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/app/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 
 interface UserProfile {
   firstName: string;

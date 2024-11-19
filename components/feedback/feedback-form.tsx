@@ -13,7 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/feedback/star-rating";
-import { apiClient } from "@/app/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 
 interface FeedbackFormProps {
   callId: string;

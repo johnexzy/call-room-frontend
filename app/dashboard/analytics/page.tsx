@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Overview } from "@/components/analytics/overview";
 import { RecentCalls } from "@/components/analytics/recent-calls";
 import { Metrics } from "@/components/analytics/metrics";
-import { apiClient } from "@/app/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 import { AnalyticsData } from "@/types/analytics";
 
 type TimeframeType = "day" | "week" | "month";

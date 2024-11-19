@@ -5,21 +5,22 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import Cookies from 'js-cookie';
 
 export function NavigationBar() {
   const router = useRouter();
   const pathname = usePathname();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
+    Cookies.remove('token');
+    Cookies.remove('refreshToken');
     router.push('/login');
   };
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard' },
-    { href: '/calls', label: 'Call History' },
-    { href: '/settings', label: 'Settings' },
+    { href: '/dashboard/calls', label: 'Call History' },
+    { href: '/dashboard/settings', label: 'Settings' },
   ];
 
   return (

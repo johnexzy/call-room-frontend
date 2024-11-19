@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { motion } from "framer-motion";
+import { MobileNav } from "./mobile-nav";
 
 export function LandingNav() {
   return (
@@ -40,7 +41,7 @@ export function LandingNav() {
               </Link>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-4">
             <ThemeToggle />
             <Link href="/login">
               <Button variant="ghost" className="text-white">
@@ -52,6 +53,10 @@ export function LandingNav() {
                 Get Started
               </Button>
             </Link>
+          </div>
+          <div className="flex md:hidden items-center space-x-4">
+            <ThemeToggle />
+            <MobileNav />
           </div>
         </div>
       </div>

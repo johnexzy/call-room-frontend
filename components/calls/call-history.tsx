@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { apiClient } from "@/app/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 
 interface CallRecord {
   id: string;

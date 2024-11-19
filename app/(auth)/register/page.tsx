@@ -19,7 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { apiClient } from '@/app/lib/api-client';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { setAuthTokens } from '@/lib/auth';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -30,128 +32,134 @@ export default function RegisterPage() {
     role: 'customer',
   });
   const router = useRouter();
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await apiClient.post('/auth/register', formData);
+      const response = await fetch('http://localhost:5200/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('token', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+        setAuthTokens(data.accessToken, data.refreshToken);
         router.push('/dashboard');
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Registration failed. Please try again.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
-      console.error('Registration failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Registration failed. Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create an Account</CardTitle>
-          <CardDescription>
-            Sign up for Callroom customer service platform
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="firstName" className="text-sm font-medium">
-                  First Name
-                </label>
-                <Input
-                  id="firstName"
-                  value={formData.firstName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, firstName: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="lastName" className="text-sm font-medium">
-                  Last Name
-                </label>
-                <Input
-                  id="lastName"
-                  value={formData.lastName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, lastName: e.target.value })
-                  }
-                  required
-                />
-              </div>
-            </div>
-
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>Create an Account</CardTitle>
+        <CardDescription>
+          Sign up for Callroom customer service platform
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
+              <Label htmlFor="firstName">First Name</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email}
+                id="firstName"
+                value={formData.firstName}
                 onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
+                  setFormData({ ...formData, firstName: e.target.value })
                 }
                 required
               />
             </div>
-
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
+              <Label htmlFor="lastName">Last Name</Label>
               <Input
-                id="password"
-                type="password"
-                value={formData.password}
+                id="lastName"
+                value={formData.lastName}
                 onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
+                  setFormData({ ...formData, lastName: e.target.value })
                 }
                 required
               />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label htmlFor="role" className="text-sm font-medium">
-                Role
-              </label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, role: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select your role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="customer">Customer</SelectItem>
-                  <SelectItem value="representative">Representative</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              required
+            />
+          </div>
 
-            <Button type="submit" className="w-full">
-              Create Account
-            </Button>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
+              required
+            />
+          </div>
 
-            <div className="text-center text-sm">
-              Already have an account?{' '}
-              <Link
-                href="/login"
-                className="font-medium text-primary hover:underline"
-              >
-                Sign in
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          <div className="space-y-2">
+            <Label htmlFor="role">Role</Label>
+            <Select
+              value={formData.role}
+              onValueChange={(value) =>
+                setFormData({ ...formData, role: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select your role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="customer">Customer</SelectItem>
+                <SelectItem value="representative">Representative</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button type="submit" className="w-full">
+            Create Account
+          </Button>
+
+          <div className="text-center text-sm">
+            Already have an account?{' '}
+            <Link
+              href="/login"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              Sign in
+            </Link>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 } 
