@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useWebSocket } from "@/app/hooks/useWebSocket";
 import { apiClient } from "@/app/lib/api-client";
+import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
+import { ErrorBoundary } from "@/components/error-boundary";
 import {
   Card,
   CardDescription,
@@ -64,35 +66,43 @@ export default function RepresentativeDashboard() {
     }
   };
 
-  return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Representative Dashboard</h1>
-        <div className="flex items-center space-x-2">
-          <Switch
-            checked={isAvailable}
-            onCheckedChange={handleAvailabilityChange}
-          />
-          <Label>Available for Calls</Label>
-        </div>
-      </div>
+  if (!socket) {
+    return <DashboardSkeleton />;
+  }
 
-      {activeCall ? (
-        <div className="space-y-6">
-          <CallInterface callId={activeCall.id} onEndCall={handleEndCall} />
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<DashboardSkeleton />}>
+        <div className="container mx-auto p-6">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">Representative Dashboard</h1>
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={isAvailable}
+                onCheckedChange={handleAvailabilityChange}
+              />
+              <Label>Available for Calls</Label>
+            </div>
+          </div>
+
+          {activeCall ? (
+            <div className="space-y-6">
+              <CallInterface callId={activeCall.id} onEndCall={handleEndCall} />
+            </div>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>No Active Calls</CardTitle>
+                <CardDescription>
+                  {isAvailable
+                    ? "Waiting for the next customer..."
+                    : "Set yourself as available to receive calls"}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )}
         </div>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>No Active Calls</CardTitle>
-            <CardDescription>
-              {isAvailable
-                ? "Waiting for the next customer..."
-                : "Set yourself as available to receive calls"}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
-    </div>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
