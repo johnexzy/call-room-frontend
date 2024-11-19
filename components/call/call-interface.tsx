@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, MicOff, Phone, Video, VideoOff } from "lucide-react";
+import { WebRTCService } from "@/lib/webrtc-service";
+import { FeedbackForm } from "@/components/feedback/feedback-form";
 
 interface CallInterfaceProps {
   callId: string;
@@ -15,16 +17,15 @@ export function CallInterface({ callId, onEndCall }: CallInterfaceProps) {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
+  const webRTCService = useRef<WebRTCService | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     initializeCall();
     return () => {
-      if (peerConnection.current) {
-        peerConnection.current.close();
-      }
+      webRTCService.current?.disconnect();
     };
-  }, []);
+  }, [callId]);
 
   const initializeCall = async () => {
     try {
@@ -37,24 +38,16 @@ export function CallInterface({ callId, onEndCall }: CallInterfaceProps) {
         localVideoRef.current.srcObject = stream;
       }
 
-      // Initialize WebRTC peer connection
-      peerConnection.current = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      });
+      webRTCService.current = new WebRTCService(callId);
+      const peerConnection = await webRTCService.current.initializePeerConnection(stream);
 
-      stream.getTracks().forEach((track) => {
-        peerConnection.current?.addTrack(track, stream);
-      });
-
-      peerConnection.current.ontrack = (event) => {
+      peerConnection.ontrack = (event) => {
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = event.streams[0];
         }
       };
 
-      // Handle WebRTC signaling here
-      // This would involve connecting to your signaling server
-      // and exchanging SDP and ICE candidates
+      await webRTCService.current.createOffer();
     } catch (error) {
       console.error("Failed to initialize call:", error);
     }
@@ -79,6 +72,15 @@ export function CallInterface({ callId, onEndCall }: CallInterfaceProps) {
       setIsVideoEnabled(!isVideoEnabled);
     }
   };
+
+  const handleEndCall = async () => {
+    await onEndCall();
+    setShowFeedback(true);
+  };
+
+  if (showFeedback) {
+    return <FeedbackForm callId={callId} />;
+  }
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
@@ -129,7 +131,7 @@ export function CallInterface({ callId, onEndCall }: CallInterfaceProps) {
           <Button
             variant="destructive"
             size="icon"
-            onClick={onEndCall}
+            onClick={handleEndCall}
             className="bg-red-500 hover:bg-red-600"
           >
             <Phone className="rotate-[135deg]" />
