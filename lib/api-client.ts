@@ -1,6 +1,6 @@
 import Cookies from 'js-cookie';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5200/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const token = Cookies.get('token');

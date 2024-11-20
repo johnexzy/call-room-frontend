@@ -6,7 +6,7 @@ import { WS_NAMESPACES } from '@/constants/websocket.constants';
 
 type NamespaceType = typeof WS_NAMESPACES[keyof typeof WS_NAMESPACES];
 
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:5200';
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL;
 
 export function useWebSocket(namespace: NamespaceType) {
   const socket = useRef<Socket | null>(null);

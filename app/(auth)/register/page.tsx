@@ -1,35 +1,35 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { setAuthTokens } from '@/lib/auth';
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { setAuthTokens } from "@/lib/auth";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    firstName: '',
-    lastName: '',
-    role: 'customer',
+    email: "",
+    password: "",
+    firstName: "",
+    lastName: "",
+    role: "customer",
   });
   const router = useRouter();
   const { toast } = useToast();
@@ -37,31 +37,34 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5200/api/v1/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
+      const response = await fetch(
+        process.env.NEXT_PUBLIC_API_URL + "/auth/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(formData),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
         setAuthTokens(data.accessToken, data.refreshToken);
-        router.push('/dashboard');
+        router.push("/dashboard");
       } else {
         toast({
-          title: 'Error',
-          description: 'Registration failed. Please try again.',
-          variant: 'destructive',
+          title: "Error",
+          description: "Registration failed. Please try again.",
+          variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Registration failed. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Registration failed. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -150,7 +153,7 @@ export default function RegisterPage() {
           </Button>
 
           <div className="text-center text-sm">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Link
               href="/login"
               className="text-primary underline-offset-4 hover:underline"
@@ -162,4 +165,4 @@ export default function RegisterPage() {
       </CardContent>
     </Card>
   );
-} 
+}
