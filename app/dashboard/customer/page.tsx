@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useWebSocket } from '@/app/hooks/useWebSocket';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { WS_NAMESPACES } from '@/constants/websocket.constants';
 
 interface QueuePosition {
   position: number;
@@ -20,7 +21,7 @@ interface QueuePosition {
 export default function CustomerDashboard() {
   const [queueInfo, setQueueInfo] = useState<QueuePosition | null>(null);
   const [isInQueue, setIsInQueue] = useState(false);
-  const socket = useWebSocket('notifications');
+  const { socket } = useWebSocket(WS_NAMESPACES.QUEUE);
 
   useEffect(() => {
     if (socket) {

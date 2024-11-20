@@ -1,108 +1,204 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { useWebSocket } from "@/app/hooks/useWebSocket";
-import { apiClient } from "@/lib/api-client";
-import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
-import { ErrorBoundary } from "@/components/error-boundary";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { CallInterface } from "@/components/call/call-interface";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { apiClient } from "@/lib/api-client";
+import { useToast } from "@/hooks/use-toast";
+import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
+import { WS_NAMESPACES, WS_EVENTS } from "@/constants/websocket.constants";
 
-interface ActiveCall {
+interface Call {
   id: string;
-  customerId: string;
-  customerName: string;
-  startTime: Date;
+  customer: {
+    firstName: string;
+    lastName: string;
+  };
+  startTime: string;
+  status: string;
 }
 
 export default function RepresentativeDashboard() {
   const [isAvailable, setIsAvailable] = useState(false);
-  const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
-  const socket = useWebSocket("notifications");
+  const [currentCall, setCurrentCall] = useState<Call | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const socket = useWebSocket(WS_NAMESPACES.CALLS);
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (socket) {
-      socket.on("notification", (notification) => {
-        if (notification.type === "call_ready") {
-          setActiveCall({
-            id: notification.data.callId,
-            customerId: notification.data.customerId,
-            customerName: notification.data.customerName,
-            startTime: new Date(),
-          });
-        }
-      });
-    }
-  }, [socket]);
+    loadInitialData();
+  }, []);
 
-  const handleAvailabilityChange = async () => {
-    try {
-      const response = await apiClient.put("/users/availability", {
-        isAvailable: !isAvailable,
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.socket?.on(WS_EVENTS.CALLS.CALL_ASSIGNED, (call: Call) => {
+      setCurrentCall(call);
+      toast({
+        title: "New Call Assigned",
+        description: `Call from ${call.customer.firstName} ${call.customer.lastName}`,
       });
+    });
+
+    socket.socket?.on(WS_EVENTS.CALLS.CALL_ENDED, () => {
+      setCurrentCall(null);
+    });
+
+    return () => {
+      socket.socket?.off(WS_EVENTS.CALLS.CALL_ASSIGNED);
+      socket.socket?.off(WS_EVENTS.CALLS.CALL_ENDED);
+    };
+  }, [socket, toast]);
+
+  const loadInitialData = async () => {
+    try {
+      const [availabilityResponse, activeCallResponse] = await Promise.all([
+        apiClient.get("/users/me/availability"),
+        apiClient.get("/calls/active"),
+      ]);
+
+      if (availabilityResponse.ok) {
+        const { isAvailable } = await availabilityResponse.json();
+        setIsAvailable(isAvailable);
+      }
+
+      if (activeCallResponse.ok) {
+        const activeCall = await activeCallResponse.json();
+        setCurrentCall(activeCall);
+      }
+    } catch (error) {
+      console.error("Failed to load initial data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAvailabilityChange = async (checked: boolean) => {
+    try {
+      const response = await apiClient.put("/users/me/availability", {
+        isAvailable: checked,
+      });
+
       if (response.ok) {
-        setIsAvailable(!isAvailable);
+        setIsAvailable(checked);
+        toast({
+          title: checked ? "Now Available" : "Now Unavailable",
+          description: checked
+            ? "You are now available for calls"
+            : "You are now unavailable for calls",
+        });
       }
     } catch (error) {
       console.error("Failed to update availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update availability",
+        variant: "destructive",
+      });
     }
   };
 
   const handleEndCall = async () => {
-    if (!activeCall) return;
+    if (!currentCall) return;
 
     try {
-      await apiClient.post(`/calls/end/${activeCall.id}`, {});
-      setActiveCall(null);
+      const response = await apiClient.put(`/calls/${currentCall.id}/end`, {
+        notes: "",
+      });
+      if (response.ok) {
+        setCurrentCall(null);
+        toast({
+          title: "Call Ended",
+          description: "The call has been ended successfully",
+        });
+      }
     } catch (error) {
       console.error("Failed to end call:", error);
+      toast({
+        title: "Error",
+        description: "Failed to end call",
+        variant: "destructive",
+      });
     }
   };
 
-  if (!socket) {
+  if (isLoading) {
     return <DashboardSkeleton />;
   }
 
   return (
-    <ErrorBoundary>
-      <Suspense fallback={<DashboardSkeleton />}>
-        <div className="container mx-auto p-6">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Representative Dashboard</h1>
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={isAvailable}
-                onCheckedChange={handleAvailabilityChange}
-              />
-              <Label>Available for Calls</Label>
-            </div>
-          </div>
-
-          {activeCall ? (
-            <div className="space-y-6">
-              <CallInterface callId={activeCall.id} onEndCall={handleEndCall} />
-            </div>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>No Active Calls</CardTitle>
-                <CardDescription>
-                  {isAvailable
-                    ? "Waiting for the next customer..."
-                    : "Set yourself as available to receive calls"}
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          )}
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Representative Dashboard</h1>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-muted-foreground">
+            {isAvailable ? "Available" : "Unavailable"}
+          </span>
+          <Switch
+            checked={isAvailable}
+            onCheckedChange={handleAvailabilityChange}
+          />
         </div>
-      </Suspense>
-    </ErrorBoundary>
+      </div>
+
+      {currentCall ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Call</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Customer</p>
+              <p className="text-lg font-medium">
+                {currentCall.customer.firstName} {currentCall.customer.lastName}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Started</p>
+              <p className="text-lg font-medium">
+                {new Date(currentCall.startTime).toLocaleTimeString()}
+              </p>
+            </div>
+            <Button
+              onClick={handleEndCall}
+              variant="destructive"
+              className="w-full"
+            >
+              End Call
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>No Active Call</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              {isAvailable
+                ? "Waiting for incoming calls..."
+                : "Set yourself as available to receive calls"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!socket && (
+        <div className="fixed bottom-4 right-4">
+          <Card className="bg-destructive text-destructive-foreground">
+            <CardContent className="p-4">
+              <p>Disconnected from server. Reconnecting...</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
   );
 }

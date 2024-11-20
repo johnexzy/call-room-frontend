@@ -15,7 +15,9 @@ export default function DashboardPage() {
         if (response.ok) {
           const user = await response.json();
           console.log("user", user);
-          if (user.role === "representative") {
+          if (user.role === "admin") {
+            router.push("/dashboard/admin");
+          } else if (user.role === "representative") {
             router.push("/dashboard/representative");
           } else {
             router.push("/dashboard/customer");

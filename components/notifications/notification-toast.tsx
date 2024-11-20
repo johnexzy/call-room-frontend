@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useWebSocket } from '@/app/hooks/useWebSocket';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { NotificationType } from '@/types/notification';
 
 export function NotificationToast() {
@@ -12,7 +12,7 @@ export function NotificationToast() {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('notification', (notification) => {
+    socket.socket?.on('notification', (notification) => {
       const title = notification.title;
       let variant: 'default' | 'destructive' = 'default';
 
@@ -33,7 +33,7 @@ export function NotificationToast() {
     });
 
     return () => {
-      socket.off('notification');
+      socket.socket?.off('notification');
     };
   }, [socket, toast]);
 
