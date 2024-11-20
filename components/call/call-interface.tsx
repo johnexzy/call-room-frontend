@@ -1,142 +1,162 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Phone, Video, VideoOff } from "lucide-react";
 import { WebRTCService } from "@/lib/webrtc-service";
-import { FeedbackForm } from "@/components/feedback/feedback-form";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { WS_NAMESPACES } from "@/constants/websocket.constants";
+import { useToast } from "@/hooks/use-toast";
 
 interface CallInterfaceProps {
   callId: string;
-  onEndCall: () => void;
+  isRepresentative?: boolean;
+  onEndCall?: () => void;
 }
 
-export function CallInterface({ callId, onEndCall }: CallInterfaceProps) {
+export function CallInterface({
+  callId,
+  isRepresentative = false,
+  onEndCall,
+}: Readonly<CallInterfaceProps>) {
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const webRTCService = useRef<WebRTCService | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(true);
+  const localAudioRef = useRef<HTMLAudioElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const webrtcRef = useRef<WebRTCService | null>(null);
+  const { socket } = useWebSocket(WS_NAMESPACES.CALLS);
+  const { toast } = useToast();
 
   useEffect(() => {
-    initializeCall();
-    return () => {
-      webRTCService.current?.disconnect();
-    };
-  }, [callId]);
+    if (!socket) return;
 
-  const initializeCall = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+    // Handle incoming WebRTC signaling messages
+    socket.on('call-offer', async ({ offer, fromUserId }) => {
+      if (!webrtcRef.current) return;
+      try {
+        const answer = await webrtcRef.current.handleOffer(offer);
+        socket.emit('call-answer', {
+          targetUserId: fromUserId,
+          answer,
+          callId,
+        });
+      } catch (error) {
+        console.error('Error handling offer:', error);
       }
+    });
 
-      webRTCService.current = new WebRTCService(callId);
-      const peerConnection = await webRTCService.current.initializePeerConnection(stream);
+    socket.on('call-answer', async ({ answer }) => {
+      if (!webrtcRef.current) return;
+      try {
+        await webrtcRef.current.handleAnswer(answer);
+      } catch (error) {
+        console.error('Error handling answer:', error);
+      }
+    });
 
-      peerConnection.ontrack = (event) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
+    socket.on('ice-candidate', async ({ candidate, fromUserId }) => {
+      if (!webrtcRef.current) return;
+      try {
+        await webrtcRef.current.addIceCandidate(candidate);
+      } catch (error) {
+        console.error('Error handling ICE candidate:', error);
+      }
+    });
+
+    // Initialize WebRTC connection
+    const initializeCall = async () => {
+      try {
+        webrtcRef.current = new WebRTCService(socket);
+        const localStream = await webrtcRef.current.startLocalStream();
+
+        if (localAudioRef.current && localStream) {
+          localAudioRef.current.srcObject = localStream;
         }
-      };
 
-      await webRTCService.current.createOffer();
-    } catch (error) {
-      console.error("Failed to initialize call:", error);
+        // If representative, create and send offer
+        if (isRepresentative) {
+          const offer = await webrtcRef.current.createOffer();
+          socket.emit('call-offer', {
+            targetUserId: callId, // This should be the customer's ID
+            offer,
+            callId,
+          });
+        }
+
+        // Handle ICE candidates
+        webrtcRef.current.onIceCandidate = (candidate) => {
+          socket.emit('ice-candidate', {
+            targetUserId: isRepresentative ? callId : 'representative-id', // Need to get the correct ID
+            candidate,
+            callId,
+          });
+        };
+      } catch (error) {
+        console.error('Error initializing call:', error);
+        toast({
+          title: 'Call Setup Failed',
+          description: 'Failed to access microphone. Please check permissions.',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    initializeCall();
+
+    return () => {
+      socket.off('call-offer');
+      socket.off('call-answer');
+      socket.off('ice-candidate');
+      webrtcRef.current?.cleanup();
+    };
+  }, [socket, callId, isRepresentative, toast]);
+
+  const handleRemoteStream = (event: Event) => {
+    const { detail: stream } = event as CustomEvent<MediaStream>;
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = stream;
     }
   };
 
   const toggleMute = () => {
-    const stream = localVideoRef.current?.srcObject as MediaStream;
-    if (stream) {
-      stream.getAudioTracks().forEach((track) => {
-        track.enabled = isMuted;
+    const localStream = localAudioRef.current?.srcObject as MediaStream;
+    if (localStream) {
+      localStream.getAudioTracks().forEach((track) => {
+        track.enabled = !track.enabled;
       });
       setIsMuted(!isMuted);
     }
   };
 
-  const toggleVideo = () => {
-    const stream = localVideoRef.current?.srcObject as MediaStream;
-    if (stream) {
-      stream.getVideoTracks().forEach((track) => {
-        track.enabled = !isVideoEnabled;
-      });
-      setIsVideoEnabled(!isVideoEnabled);
-    }
+  const handleEndCall = () => {
+    webrtcRef.current?.cleanup();
+    onEndCall?.();
   };
-
-  const handleEndCall = async () => {
-    await onEndCall();
-    setShowFeedback(true);
-  };
-
-  if (showFeedback) {
-    return <FeedbackForm callId={callId} />;
-  }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardContent className="p-6">
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute bottom-2 left-2 text-white text-sm">
-              You
-            </div>
-          </div>
-          <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute bottom-2 left-2 text-white text-sm">
-              Customer
-            </div>
-          </div>
-        </div>
-
+    <Card>
+      <CardContent className="p-6 space-y-4">
         <div className="flex justify-center space-x-4">
           <Button
-            variant="outline"
-            size="icon"
+            variant={isMuted ? "destructive" : "outline"}
             onClick={toggleMute}
-            className={isMuted ? "bg-red-100" : ""}
           >
-            {isMuted ? <MicOff /> : <Mic />}
+            {isMuted ? "Unmute" : "Mute"}
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={toggleVideo}
-            className={!isVideoEnabled ? "bg-red-100" : ""}
-          >
-            {isVideoEnabled ? <Video /> : <VideoOff />}
-          </Button>
-          <Button
-            variant="destructive"
-            size="icon"
-            onClick={handleEndCall}
-            className="bg-red-500 hover:bg-red-600"
-          >
-            <Phone className="rotate-[135deg]" />
+          <Button variant="destructive" onClick={handleEndCall}>
+            End Call
           </Button>
         </div>
+
+        {isConnecting && (
+          <div className="text-center text-muted-foreground">
+            Connecting call...
+          </div>
+        )}
+
+        <audio ref={localAudioRef} autoPlay muted />
+        <audio ref={remoteAudioRef} autoPlay />
       </CardContent>
     </Card>
   );

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useWebSocket } from '../app/hooks/useWebSocket';
-import { apiClient } from '@/app/lib/api-client';
+import { useEffect, useState } from "react";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { apiClient } from "@/lib/api-client";
 
 interface AnalyticsMetrics {
   totalCalls: number;
@@ -21,27 +21,27 @@ interface QualityMetrics {
   };
 }
 
-export function useAnalytics(timeframe: 'day' | 'week' | 'month') {
+export function useAnalytics(timeframe: "day" | "week" | "month") {
   const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null);
   const [quality, setQuality] = useState<QualityMetrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const socket = useWebSocket('analytics');
+  const { socket } = useWebSocket("analytics");
 
   useEffect(() => {
     if (socket) {
-      socket.on('metrics_update', (data: AnalyticsMetrics) => {
+      socket.on("metrics_update", (data: AnalyticsMetrics) => {
         setMetrics(data);
       });
 
-      socket.on('quality_update', (data: QualityMetrics) => {
+      socket.on("quality_update", (data: QualityMetrics) => {
         setQuality(data);
       });
     }
 
     return () => {
       if (socket) {
-        socket.off('metrics_update');
-        socket.off('quality_update');
+        socket.off("metrics_update");
+        socket.off("quality_update");
       }
     };
   }, [socket]);
@@ -65,7 +65,7 @@ export function useAnalytics(timeframe: 'day' | 'week' | 'month') {
           setQuality(qualityData);
         }
       } catch (error) {
-        console.error('Failed to load analytics:', error);
+        console.error("Failed to load analytics:", error);
       } finally {
         setLoading(false);
       }
@@ -75,4 +75,4 @@ export function useAnalytics(timeframe: 'day' | 'week' | 'month') {
   }, [timeframe]);
 
   return { metrics, quality, loading };
-} 
+}

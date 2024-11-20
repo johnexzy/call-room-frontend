@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api-client";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { WS_NAMESPACES, WS_EVENTS } from '@/constants/websocket.constants';
 
 interface QueueEntry {
   position: number;
@@ -22,19 +23,19 @@ interface QueueEntry {
 
 export default function QueueManagementPage() {
   const [queue, setQueue] = useState<QueueEntry[]>([]);
-  const { socket } = useWebSocket("queue");
+  const { socket } = useWebSocket(WS_NAMESPACES.QUEUE);
 
   useEffect(() => {
     loadQueue();
 
     if (socket) {
-      socket.on("queue_update", () => {
+      socket.on(WS_EVENTS.QUEUE.QUEUE_UPDATE, () => {
         loadQueue();
       });
     }
 
     return () => {
-      socket?.off("queue_update");
+      socket?.off(WS_EVENTS.QUEUE.QUEUE_UPDATE);
     };
   }, [socket]);
 

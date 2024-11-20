@@ -27,7 +27,6 @@ export function useWebSocket(namespace: NamespaceType) {
       extraHeaders: {
         Authorization: `Bearer ${token}`,
       },
-      withCredentials: true,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,

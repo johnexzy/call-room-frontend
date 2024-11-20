@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
 import { WS_NAMESPACES, WS_EVENTS } from "@/constants/websocket.constants";
+import { CallInterface } from "@/components/call/call-interface";
 
 interface Call {
   id: string;
@@ -149,32 +149,34 @@ export default function RepresentativeDashboard() {
       </div>
 
       {currentCall ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Call</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Customer</p>
-              <p className="text-lg font-medium">
-                {currentCall.customer.firstName} {currentCall.customer.lastName}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Started</p>
-              <p className="text-lg font-medium">
-                {new Date(currentCall.startTime).toLocaleTimeString()}
-              </p>
-            </div>
-            <Button
-              onClick={handleEndCall}
-              variant="destructive"
-              className="w-full"
-            >
-              End Call
-            </Button>
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Call</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Customer</p>
+                <p className="text-lg font-medium">
+                  {currentCall.customer.firstName}{" "}
+                  {currentCall.customer.lastName}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Started</p>
+                <p className="text-lg font-medium">
+                  {new Date(currentCall.startTime).toLocaleTimeString()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <CallInterface
+            callId={currentCall.id}
+            isRepresentative={true}
+            onEndCall={handleEndCall}
+          />
+        </>
       ) : (
         <Card>
           <CardHeader>

@@ -11,30 +11,66 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { WS_NAMESPACES } from '@/constants/websocket.constants';
+import { WS_NAMESPACES, WS_EVENTS } from '@/constants/websocket.constants';
+import { useToast } from '@/hooks/use-toast';
+import { CallInterface } from '@/components/call/call-interface';
 
 interface QueuePosition {
   position: number;
   estimatedMinutes: number;
 }
 
+interface Call {
+  id: string;
+  customer: {
+    firstName: string;
+    lastName: string;
+  };
+  startTime: number;
+}
+
 export default function CustomerDashboard() {
   const [queueInfo, setQueueInfo] = useState<QueuePosition | null>(null);
   const [isInQueue, setIsInQueue] = useState(false);
-  const { socket } = useWebSocket(WS_NAMESPACES.QUEUE);
+  const { socket, isConnected } = useWebSocket(WS_NAMESPACES.QUEUE);
+  const { toast } = useToast();
+  const [currentCall, setCurrentCall] = useState<Call | null>(null);
 
   useEffect(() => {
-    if (socket) {
-      socket.on('notification', (notification) => {
-        if (notification.type === 'queue_update') {
-          setQueueInfo({
-            position: notification.data.position,
-            estimatedMinutes: notification.data.estimatedWaitTime,
-          });
-        }
+    if (!socket) return;
+
+    socket.on(WS_EVENTS.QUEUE.POSITION_UPDATE, (data) => {
+      setQueueInfo({
+        position: data.position,
+        estimatedMinutes: data.estimatedWaitTime,
       });
-    }
-  }, [socket]);
+    });
+
+    socket.on(WS_EVENTS.QUEUE.YOUR_TURN, async (data) => {
+      toast({
+        title: "It's Your Turn!",
+        description: data.message,
+      });
+      setIsInQueue(false);
+      setQueueInfo(null);
+      
+      // Get active call details
+      try {
+        const response = await apiClient.get('/calls/active');
+        if (response.ok) {
+          const callData = await response.json();
+          setCurrentCall(callData);
+        }
+      } catch (error) {
+        console.error('Failed to get call details:', error);
+      }
+    });
+
+    return () => {
+      socket.off(WS_EVENTS.QUEUE.POSITION_UPDATE);
+      socket.off(WS_EVENTS.QUEUE.YOUR_TURN);
+    };
+  }, [socket, toast]);
 
   const joinQueue = async () => {
     try {
@@ -49,14 +85,24 @@ export default function CustomerDashboard() {
       }
     } catch (error) {
       console.error('Failed to join queue:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to join queue. Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-8">Customer Service Queue</h1>
+      <h1 className="text-3xl font-bold mb-8">Customer Service</h1>
 
-      {!isInQueue ? (
+      {currentCall ? (
+        <CallInterface
+          callId={currentCall.id}
+          onEndCall={() => setCurrentCall(null)}
+        />
+      ) : !isInQueue ? (
         <Card>
           <CardHeader>
             <CardTitle>Join Queue</CardTitle>
@@ -90,6 +136,16 @@ export default function CustomerDashboard() {
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {!isConnected && (
+        <div className="fixed bottom-4 right-4">
+          <Card className="bg-destructive text-destructive-foreground">
+            <CardContent className="p-4">
+              <p>Disconnected from server. Reconnecting...</p>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
