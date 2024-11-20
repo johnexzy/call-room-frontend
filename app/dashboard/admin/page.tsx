@@ -7,6 +7,7 @@ import { RecentCalls } from "@/components/analytics/recent-calls";
 import { Metrics } from "@/components/analytics/metrics";
 import { apiClient } from "@/lib/api-client";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { WS_NAMESPACES } from "@/constants/websocket.constants";
 
 interface SystemMetrics {
   totalCalls: number;
@@ -19,7 +20,7 @@ interface SystemMetrics {
 
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
-  const { socket } = useWebSocket("analytics");
+  const { socket } = useWebSocket(WS_NAMESPACES.ANALYTICS);
 
   useEffect(() => {
     loadMetrics();

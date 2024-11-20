@@ -21,9 +21,6 @@ export function useWebSocket(namespace: NamespaceType) {
     }
 
     const newSocket = io(`${WS_BASE_URL}/${namespace}`, {
-      auth: {
-        token,
-      },
       extraHeaders: {
         Authorization: `Bearer ${token}`,
       },

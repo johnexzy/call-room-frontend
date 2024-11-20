@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api-client";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { formatDistanceToNow } from "date-fns";
+import { WS_NAMESPACES } from "@/constants/websocket.constants";
 
 interface ActiveCall {
   id: string;
@@ -35,7 +36,7 @@ interface ActiveCall {
 
 export default function ActiveCallsPage() {
   const [activeCalls, setActiveCalls] = useState<ActiveCall[]>([]);
-  const { socket } = useWebSocket("calls");
+  const { socket } = useWebSocket(WS_NAMESPACES.CALLS);
 
   useEffect(() => {
     loadActiveCalls();

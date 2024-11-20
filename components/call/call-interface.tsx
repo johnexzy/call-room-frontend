@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -12,12 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 interface CallInterfaceProps {
   callId: string;
   isRepresentative?: boolean;
+  targetUserId?: string;
   onEndCall?: () => void;
 }
 
 export function CallInterface({
   callId,
   isRepresentative = false,
+  targetUserId,
   onEndCall,
 }: Readonly<CallInterfaceProps>) {
   const [isMuted, setIsMuted] = useState(false);
@@ -29,43 +30,61 @@ export function CallInterface({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!socket) return;
+    console.log("socket", socket);
+    console.log("targetUserId", targetUserId);
+    if (!socket || !targetUserId) return;
 
-    // Handle incoming WebRTC signaling messages
-    socket.on('call-offer', async ({ offer, fromUserId }) => {
+    console.log("targetUserId", targetUserId);
+    const handleRemoteStream = (event: Event) => {
+      const { detail: stream } = event as CustomEvent<MediaStream>;
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream;
+      }
+    };
+
+    window.addEventListener('remoteStreamUpdated', handleRemoteStream);
+
+    socket.on("call-offer", async ({ offer, fromUserId }) => {
       if (!webrtcRef.current) return;
       try {
         const answer = await webrtcRef.current.handleOffer(offer);
-        socket.emit('call-answer', {
+        socket.emit("call-answer", {
           targetUserId: fromUserId,
           answer,
           callId,
         });
+        setIsConnecting(false);
       } catch (error) {
-        console.error('Error handling offer:', error);
+        console.error("Error handling offer:", error);
       }
     });
 
-    socket.on('call-answer', async ({ answer }) => {
+    socket.on("call-answer", async ({ answer }) => {
       if (!webrtcRef.current) return;
       try {
         await webrtcRef.current.handleAnswer(answer);
+        setIsConnecting(false);
       } catch (error) {
-        console.error('Error handling answer:', error);
+        console.error("Error handling answer:", error);
       }
     });
 
-    socket.on('ice-candidate', async ({ candidate, fromUserId }) => {
+    socket.on("ice-candidate", async ({ candidate }) => {
       if (!webrtcRef.current) return;
       try {
         await webrtcRef.current.addIceCandidate(candidate);
       } catch (error) {
-        console.error('Error handling ICE candidate:', error);
+        console.error("Error handling ICE candidate:", error);
       }
+    });
+
+    socket.on("call_ended", () => {
+      handleEndCall();
     });
 
     // Initialize WebRTC connection
     const initializeCall = async () => {
+      console.log("initializeCall");
       try {
         webrtcRef.current = new WebRTCService(socket);
         const localStream = await webrtcRef.current.startLocalStream();
@@ -76,9 +95,10 @@ export function CallInterface({
 
         // If representative, create and send offer
         if (isRepresentative) {
+          console.log("isRepresentative");
           const offer = await webrtcRef.current.createOffer();
-          socket.emit('call-offer', {
-            targetUserId: callId, // This should be the customer's ID
+          socket.emit("call-offer", {
+            targetUserId,
             offer,
             callId,
           });
@@ -86,18 +106,18 @@ export function CallInterface({
 
         // Handle ICE candidates
         webrtcRef.current.onIceCandidate = (candidate) => {
-          socket.emit('ice-candidate', {
-            targetUserId: isRepresentative ? callId : 'representative-id', // Need to get the correct ID
+          socket.emit("ice-candidate", {
+            targetUserId,
             candidate,
             callId,
           });
         };
       } catch (error) {
-        console.error('Error initializing call:', error);
+        console.error("Error initializing call:", error);
         toast({
-          title: 'Call Setup Failed',
-          description: 'Failed to access microphone. Please check permissions.',
-          variant: 'destructive',
+          title: "Call Setup Failed",
+          description: "Failed to access microphone. Please check permissions.",
+          variant: "destructive",
         });
       }
     };
@@ -105,19 +125,14 @@ export function CallInterface({
     initializeCall();
 
     return () => {
-      socket.off('call-offer');
-      socket.off('call-answer');
-      socket.off('ice-candidate');
+      window.removeEventListener('remoteStreamUpdated', handleRemoteStream);
+      socket.off("call-offer");
+      socket.off("call-answer");
+      socket.off("ice-candidate");
+      socket.off("call_ended");
       webrtcRef.current?.cleanup();
     };
-  }, [socket, callId, isRepresentative, toast]);
-
-  const handleRemoteStream = (event: Event) => {
-    const { detail: stream } = event as CustomEvent<MediaStream>;
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = stream;
-    }
-  };
+  }, [socket, callId, isRepresentative, targetUserId, toast]);
 
   const toggleMute = () => {
     const localStream = localAudioRef.current?.srcObject as MediaStream;
@@ -130,8 +145,8 @@ export function CallInterface({
   };
 
   const handleEndCall = () => {
-    webrtcRef.current?.cleanup();
     onEndCall?.();
+    webrtcRef.current?.cleanup();
   };
 
   return (

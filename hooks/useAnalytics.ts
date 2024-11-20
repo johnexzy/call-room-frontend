@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { apiClient } from "@/lib/api-client";
-
+import { WS_NAMESPACES } from "@/constants/websocket.constants";
 interface AnalyticsMetrics {
   totalCalls: number;
   missedCalls: number;
@@ -25,7 +25,7 @@ export function useAnalytics(timeframe: "day" | "week" | "month") {
   const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null);
   const [quality, setQuality] = useState<QualityMetrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const { socket } = useWebSocket("analytics");
+  const { socket } = useWebSocket(WS_NAMESPACES.ANALYTICS);
 
   useEffect(() => {
     if (socket) {

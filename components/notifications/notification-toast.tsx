@@ -4,11 +4,12 @@ import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { NotificationType } from '@/types/notification';
+import { WS_NAMESPACES } from '@/constants/websocket.constants';
 
 export function NotificationToast() {
   const { toast } = useToast();
-  const socket = useWebSocket('notifications');
-
+  const socket = useWebSocket(WS_NAMESPACES.NOTIFICATIONS);
+    
   useEffect(() => {
     if (!socket) return;
 

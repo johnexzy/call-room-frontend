@@ -15,6 +15,7 @@ interface Call {
   customer: {
     firstName: string;
     lastName: string;
+    id: string;
   };
   startTime: string;
   status: string;
@@ -42,13 +43,9 @@ export default function RepresentativeDashboard() {
       });
     });
 
-    socket.socket?.on(WS_EVENTS.CALLS.CALL_ENDED, () => {
-      setCurrentCall(null);
-    });
 
     return () => {
       socket.socket?.off(WS_EVENTS.CALLS.CALL_ASSIGNED);
-      socket.socket?.off(WS_EVENTS.CALLS.CALL_ENDED);
     };
   }, [socket, toast]);
 
@@ -69,12 +66,12 @@ export default function RepresentativeDashboard() {
         setCurrentCall(activeCall);
       }
     } catch (error) {
-      console.error("Failed to load initial data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive",
-      });
+      // console.error("Failed to load initial data:", error);
+      // toast({
+      //   title: "Error",
+      //   description: "Failed to load dashboard data",
+      //   variant: "destructive",
+      // });
     } finally {
       setIsLoading(false);
     }
@@ -111,14 +108,18 @@ export default function RepresentativeDashboard() {
     try {
       const response = await apiClient.put(`/calls/${currentCall.id}/end`, {
         notes: "",
+        
       });
       if (response.ok) {
         setCurrentCall(null);
         toast({
           title: "Call Ended",
-          description: "The call has been ended successfully",
+          description: "The call has ended successfully",
         });
       }
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (error) {
       console.error("Failed to end call:", error);
       toast({
@@ -175,6 +176,7 @@ export default function RepresentativeDashboard() {
             callId={currentCall.id}
             isRepresentative={true}
             onEndCall={handleEndCall}
+            targetUserId={currentCall.customer.id}
           />
         </>
       ) : (
