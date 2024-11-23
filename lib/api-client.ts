@@ -55,10 +55,10 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 
 export const apiClient = {
   get: (endpoint: string) => fetchWithAuth(endpoint),
-  post: (endpoint: string, data: any) =>
+  post: (endpoint: string, data?: any) =>
     fetchWithAuth(endpoint, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: data ? JSON.stringify(data) : undefined,
     }),
   put: (endpoint: string, data: any) =>
     fetchWithAuth(endpoint, {

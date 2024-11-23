@@ -9,6 +9,14 @@ import { useToast } from "@/hooks/use-toast";
 import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
 import { WS_NAMESPACES, WS_EVENTS } from "@/constants/websocket.constants";
 import { CallInterface } from "@/components/call/call-interface";
+import { SentimentAnalyzer } from "@/components/calls/sentiment-analyzer";
+import { CallRecorder } from "@/components/calls/call-recorder";
+import { NetworkStats } from "@/components/calls/network-stats";
+import { CallNotes } from "@/components/calls/call-notes";
+import { JourneyTimeline } from "@/components/customer/journey-timeline";
+import { KnowledgeBase } from "@/components/knowledge/knowledge-base";
+import { CallSummary } from "@/components/calls/call-summary";
+import { NextSteps } from "@/components/calls/next-steps";
 
 interface Call {
   id: string;
@@ -149,50 +157,76 @@ export default function RepresentativeDashboard() {
         </div>
       </div>
 
-      {currentCall ? (
-        <>
+      <div className="grid gap-6 lg:grid-cols-[1fr,400px]">
+        {currentCall ? (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Active Call</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Customer</p>
+                  <p className="text-lg font-medium">
+                    {currentCall.customer.firstName}{" "}
+                    {currentCall.customer.lastName}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Started</p>
+                  <p className="text-lg font-medium">
+                    {new Date(currentCall.startTime).toLocaleTimeString()}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <CallInterface
+                callId={currentCall.id}
+                targetUserId={currentCall.customer.id}
+                onEndCall={handleEndCall}
+                isRepresentative={true}
+              />
+              <div className="space-y-6">
+                <SentimentAnalyzer callId={currentCall.id} />
+                <NetworkStats callId={currentCall.id} />
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <CallSummary callId={currentCall.id} />
+              <NextSteps context={`Customer: ${currentCall.customer.firstName} ${currentCall.customer.lastName}`} />
+            </div>
+
+            <JourneyTimeline customerId={currentCall.customer.id} />
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <CallRecorder callId={currentCall.id} isActive={true} />
+              <CallNotes callId={currentCall.id} isActive={true} />
+            </div>
+          </div>
+        ) : (
           <Card>
             <CardHeader>
-              <CardTitle>Active Call</CardTitle>
+              <CardTitle>
+                {isAvailable ? "Waiting for Calls" : "Currently Unavailable"}
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Customer</p>
-                <p className="text-lg font-medium">
-                  {currentCall.customer.firstName}{" "}
-                  {currentCall.customer.lastName}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Started</p>
-                <p className="text-lg font-medium">
-                  {new Date(currentCall.startTime).toLocaleTimeString()}
-                </p>
-              </div>
+            <CardContent>
+              <p className="text-muted-foreground">
+                {isAvailable
+                  ? "You will be notified when a customer is assigned to you."
+                  : "Toggle availability to start receiving calls."}
+              </p>
             </CardContent>
           </Card>
+        )}
 
-          <CallInterface
-            callId={currentCall.id}
-            isRepresentative={true}
-            onEndCall={handleEndCall}
-            targetUserId={currentCall.customer.id}
-          />
-        </>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>No Active Call</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              {isAvailable
-                ? "Waiting for incoming calls..."
-                : "Set yourself as available to receive calls"}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        <div className="space-y-6">
+          <KnowledgeBase />
+        </div>
+      </div>
 
       {!socket && (
         <div className="fixed bottom-4 right-4">

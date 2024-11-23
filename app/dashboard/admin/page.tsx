@@ -8,6 +8,7 @@ import { Metrics } from "@/components/analytics/metrics";
 import { apiClient } from "@/lib/api-client";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { WS_NAMESPACES } from "@/constants/websocket.constants";
+import { ActiveCalls } from "@/components/admin/active-calls";
 
 interface SystemMetrics {
   totalCalls: number;
@@ -96,6 +97,8 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <ActiveCalls />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4">

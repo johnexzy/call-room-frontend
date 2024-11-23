@@ -1,19 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { format } from "date-fns";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { apiClient } from "@/lib/api-client";
+import { useEffect, useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { apiClient } from '@/lib/api-client';
+import { Skeleton } from '@/components/ui/skeleton';
 
-interface RecentCall {
+interface Call {
   id: string;
   customer: {
     firstName: string;
@@ -24,64 +16,96 @@ interface RecentCall {
     lastName: string;
   };
   startTime: string;
-  endTime: string;
   status: string;
-  rating?: number;
+  feedback?: Array<{
+    rating: number;
+  }>;
+}
+
+interface CallsResponse {
+  data: Call[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export function RecentCalls() {
-  const [calls, setCalls] = useState<RecentCall[]>([]);
+  const [calls, setCalls] = useState<Call[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const loadRecentCalls = async () => {
+      try {
+        const response = await apiClient.get('/calls/history?page=1&limit=5');
+        if (response.ok) {
+          const data: CallsResponse = await response.json();
+          setCalls(data.data);
+        }
+      } catch (error) {
+        console.error('Failed to load recent calls:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     loadRecentCalls();
   }, []);
 
-  const loadRecentCalls = async () => {
-    try {
-      const response = await apiClient.get("/calls/history?limit=5");
-      if (response.ok) {
-        const data = await response.json();
-        setCalls(data);
-      }
-    } catch (error) {
-      console.error("Failed to load recent calls:", error);
-    }
+  const getAverageRating = (feedback?: Array<{ rating: number }>) => {
+    if (!feedback?.length) return null;
+    const sum = feedback.reduce((acc, curr) => acc + curr.rating, 0);
+    return (sum / feedback.length).toFixed(1);
   };
 
-  const getStatusVariant = (status: string) => {
-    if (status === "completed") return "success";
-    if (status === "missed") return "destructive";
-    return "secondary";
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(5)].map((_, index) => (
+          <div key={index} className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Skeleton className="h-4 w-[200px]" />
+              <Skeleton className="h-3 w-[150px]" />
+            </div>
+            <Skeleton className="h-4 w-[100px]" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Time</TableHead>
-          <TableHead>Customer</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Rating</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {calls.map((call) => (
-          <TableRow key={call.id}>
-            <TableCell>{format(new Date(call.startTime), "HH:mm")}</TableCell>
-            <TableCell>
+    <div className="space-y-4">
+      {calls.map((call) => (
+        <div key={call.id} className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">
               {call.customer.firstName} {call.customer.lastName}
-            </TableCell>
-            <TableCell>
-              <Badge
-                variant={getStatusVariant(call.status)}
-              >
-                {call.status}
-              </Badge>
-            </TableCell>
-            <TableCell>{call.rating ? `${call.rating}/5` : "-"}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              with {call.representative.firstName} {call.representative.lastName}
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            {getAverageRating(call.feedback) && (
+              <span className="text-sm text-muted-foreground">
+                ★ {getAverageRating(call.feedback)}
+              </span>
+            )}
+            <span className="text-sm text-muted-foreground">
+              {formatDistanceToNow(new Date(call.startTime), { addSuffix: true })}
+            </span>
+          </div>
+        </div>
+      ))}
+
+      {calls.length === 0 && (
+        <p className="text-center text-sm text-muted-foreground py-4">
+          No recent calls
+        </p>
+      )}
+    </div>
   );
 }
