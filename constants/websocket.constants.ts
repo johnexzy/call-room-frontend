@@ -1,8 +1,8 @@
 export const WS_NAMESPACES = {
   CALLS: 'calls',
-  QUEUE: 'queue',
   NOTIFICATIONS: 'notifications',
   ANALYTICS: 'analytics',
+  QUEUE: 'queue',
 } as const;
 
 export const WS_EVENTS = {
@@ -10,18 +10,17 @@ export const WS_EVENTS = {
     CALL_ASSIGNED: 'call_assigned',
     CALL_ENDED: 'call_ended',
     CALL_UPDATE: 'call_update',
-    QUALITY_UPDATE: 'quality_update',
-  },
-  QUEUE: {
-    POSITION_UPDATE: 'position_update',
-    QUEUE_UPDATE: 'queue_update',
-    YOUR_TURN: 'your_turn',
+    VOICE_DATA: 'voiceData',
   },
   NOTIFICATIONS: {
-    NOTIFICATION: 'notification',
+    NEW_NOTIFICATION: 'new_notification',
   },
   ANALYTICS: {
     METRICS_UPDATE: 'metrics_update',
-    QUALITY_UPDATE: 'quality_update',
+  },
+  QUEUE: {
+    QUEUE_UPDATE: 'queue_update',
+    POSITION_UPDATE: 'position_update',
+    YOUR_TURN: 'your_turn',
   },
 } as const; 

@@ -215,4 +215,8 @@ export class WebRTCService {
   getStats() {
     return this.peerConnection?.getStats();
   }
+
+  get connection(): RTCPeerConnection | null {
+    return this.peerConnection;
+  }
 } 
