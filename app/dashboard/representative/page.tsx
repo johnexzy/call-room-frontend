@@ -51,7 +51,6 @@ export default function RepresentativeDashboard() {
       });
     });
 
-
     return () => {
       socket.socket?.off(WS_EVENTS.CALLS.CALL_ASSIGNED);
     };
@@ -116,7 +115,6 @@ export default function RepresentativeDashboard() {
     try {
       const response = await apiClient.put(`/calls/${currentCall.id}/end`, {
         notes: "",
-        
       });
       if (response.ok) {
         setCurrentCall(null);
