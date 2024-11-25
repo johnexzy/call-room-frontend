@@ -15,7 +15,7 @@ interface CallRecorderProps {
   isActive: boolean;
 }
 
-export function CallRecorder({
+export default function CallRecorder({
   callId,
   isActive,
 }: Readonly<CallRecorderProps>) {

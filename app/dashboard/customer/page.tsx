@@ -13,8 +13,12 @@ import {
 } from "@/components/ui/card";
 import { WS_NAMESPACES, WS_EVENTS } from "@/constants/websocket.constants";
 import { useToast } from "@/hooks/use-toast";
-import { CallInterface } from "@/components/call/call-interface";
+import dynamic from "next/dynamic.js";
 
+const CallInterface = dynamic(
+  () => import("@/components/call/call-interface"),
+  { ssr: false }
+);
 interface QueuePosition {
   position: number;
   estimatedMinutes: number;
@@ -41,7 +45,6 @@ export default function CustomerDashboard() {
   const callSocket = useWebSocket(WS_NAMESPACES.CALLS);
   const { toast } = useToast();
   const [currentCall, setCurrentCall] = useState<Call | null>(null);
-
 
   useEffect(() => {
     if (!queueSocket.socket) return;

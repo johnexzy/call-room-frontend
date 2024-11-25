@@ -6,39 +6,46 @@ import AgoraRTC, {
 } from "agora-rtc-sdk-ng";
 
 export class AgoraService {
-  private client: IAgoraRTCClient;
+  private client: IAgoraRTCClient | undefined;
   private localAudioTrack: IMicrophoneAudioTrack | null = null;
   private appId: string;
   private mediaRecorder: MediaRecorder | null = null;
   private recordedChunks: Blob[] = [];
 
   constructor() {
+    if (typeof window === "undefined") {
+      throw new Error("AgoraService can only be instantiated in browser environment");
+    }
+    
     this.appId = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
-    this.client = AgoraRTC.createClient({ 
-      mode: "rtc", 
+    this.client = AgoraRTC.createClient({
+      mode: "rtc",
       codec: "vp8",
     });
   }
 
   async join(channelName: string, token: string, uid: string) {
     try {
-      await this.client.join(this.appId, channelName, token, uid);
+      await this.client?.join(this.appId, channelName, token, uid);
       this.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
         encoderConfig: {
           sampleRate: 48000,
           stereo: false,
           bitrate: 48,
-        }
+        },
       });
-      await this.client.publish([this.localAudioTrack]);
+      await this.client?.publish([this.localAudioTrack]);
 
-      this.client.on("user-published", async (user: IAgoraRTCRemoteUser, mediaType: "audio" | "video") => {
-        await this.client.subscribe(user, mediaType);
-        if (mediaType === "audio" && user.audioTrack) {
-          const remoteAudioTrack = user.audioTrack as IRemoteAudioTrack;
-          remoteAudioTrack.play();
+      this.client?.on(
+        "user-published",
+        async (user: IAgoraRTCRemoteUser, mediaType: "audio" | "video") => {
+          await this.client?.subscribe(user, mediaType);
+          if (mediaType === "audio" && user.audioTrack) {
+            const remoteAudioTrack = user.audioTrack as IRemoteAudioTrack;
+            remoteAudioTrack.play();
+          }
         }
-      });
+      );
 
       return true;
     } catch (error) {
@@ -49,13 +56,13 @@ export class AgoraService {
 
   async leave() {
     try {
-      if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
         this.mediaRecorder.stop();
       }
       if (this.localAudioTrack) {
         await this.localAudioTrack.close();
       }
-      await this.client.leave();
+      await this.client?.leave();
     } catch (error) {
       console.error("Error leaving channel:", error);
     }
@@ -78,13 +85,15 @@ export class AgoraService {
     if (!this.localAudioTrack) return null;
 
     try {
-      const mediaStream = new MediaStream([this.localAudioTrack.getMediaStreamTrack()]);
-      
+      const mediaStream = new MediaStream([
+        this.localAudioTrack.getMediaStreamTrack(),
+      ]);
+
       this.recordedChunks = [];
       this.mediaRecorder = new MediaRecorder(mediaStream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-          ? 'audio/webm;codecs=opus' 
-          : 'audio/webm',
+        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/webm",
       });
 
       this.mediaRecorder.ondataavailable = (event) => {
@@ -103,14 +112,14 @@ export class AgoraService {
 
   async stopRecording(): Promise<Blob | null> {
     return new Promise((resolve) => {
-      if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+      if (!this.mediaRecorder || this.mediaRecorder.state === "inactive") {
         resolve(null);
         return;
       }
 
       this.mediaRecorder.onstop = () => {
-        const blob = new Blob(this.recordedChunks, { 
-          type: 'audio/webm;codecs=opus' 
+        const blob = new Blob(this.recordedChunks, {
+          type: "audio/webm;codecs=opus",
         });
         this.recordedChunks = [];
         resolve(blob);
