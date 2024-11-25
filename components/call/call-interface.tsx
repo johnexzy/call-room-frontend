@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { WebRTCService } from "@/lib/webrtc-service";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { WS_NAMESPACES } from "@/constants/websocket.constants";
 import { useToast } from "@/hooks/use-toast";
+import { AgoraService } from '@/lib/agora-service';
+import { apiClient } from '@/lib/api-client';
 
 interface CallInterfaceProps {
   callId: string;
@@ -17,107 +18,35 @@ interface CallInterfaceProps {
 
 export function CallInterface({
   callId,
-  isRepresentative = false,
   targetUserId,
   onEndCall,
 }: Readonly<CallInterfaceProps>) {
   const [isMuted, setIsMuted] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
-  const localAudioRef = useRef<HTMLAudioElement>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);
-  const webrtcRef = useRef<WebRTCService | null>(null);
+  const agoraRef = useRef<AgoraService | null>(null);
   const { socket } = useWebSocket(WS_NAMESPACES.CALLS);
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log("socket", socket);
-    console.log("targetUserId", targetUserId);
-    if (!socket || !targetUserId) return;
+    if (!socket?.connected || !targetUserId) return;
 
-    console.log("targetUserId", targetUserId);
-    const handleRemoteStream = (event: Event) => {
-      const { detail: stream } = event as CustomEvent<MediaStream>;
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = stream;
-      }
-    };
-
-    window.addEventListener('remoteStreamUpdated', handleRemoteStream);
-
-    socket.on("call-offer", async ({ offer, fromUserId }) => {
-      if (!webrtcRef.current) return;
-      try {
-        const answer = await webrtcRef.current.handleOffer(offer);
-        socket.emit("call-answer", {
-          targetUserId: fromUserId,
-          answer,
-          callId,
-        });
-        setIsConnecting(false);
-      } catch (error) {
-        console.error("Error handling offer:", error);
-      }
-    });
-
-    socket.on("call-answer", async ({ answer }) => {
-      if (!webrtcRef.current) return;
-      try {
-        await webrtcRef.current.handleAnswer(answer);
-        setIsConnecting(false);
-      } catch (error) {
-        console.error("Error handling answer:", error);
-      }
-    });
-
-    socket.on("ice-candidate", async ({ candidate }) => {
-      if (!webrtcRef.current) return;
-      try {
-        await webrtcRef.current.addIceCandidate(candidate);
-      } catch (error) {
-        console.error("Error handling ICE candidate:", error);
-      }
-    });
-
-    socket.on("call_ended", () => {
-      handleEndCall();
-    });
-
-    // Initialize WebRTC connection
     const initializeCall = async () => {
-      console.log("initializeCall");
       try {
-        webrtcRef.current = new WebRTCService(socket);
-        const localStream = await webrtcRef.current.startLocalStream();
-
-        if (localAudioRef.current && localStream) {
-          localAudioRef.current.srcObject = localStream;
-        }
-
-        // If representative, create and send offer
-        if (isRepresentative) {
-          console.log("isRepresentative");
-          const offer = await webrtcRef.current.createOffer();
-          socket.emit("call-offer", {
-            targetUserId,
-            offer,
-            callId,
-          });
-        }
-
-        // Handle ICE candidates
-        webrtcRef.current.onIceCandidate = (candidate) => {
-          socket.emit("ice-candidate", {
-            targetUserId,
-            candidate,
-            callId,
-          });
-        };
+        // Get token from your backend
+        const response = await apiClient.get(`/calls/${callId}/token`);
+        if (!response.ok) throw new Error('Failed to get token');
+        
+        const { token, channel } = await response.json();
+        
+        agoraRef.current = new AgoraService();
+        await agoraRef.current.join(channel, token, targetUserId);
+        setIsConnecting(false);
       } catch (error) {
-        console.error("Error initializing call:", error);
+        console.error('Failed to initialize call:', error);
         toast({
-          title: "Call Setup Failed",
-          description: "Failed to access microphone. Please check permissions.",
-          variant: "destructive",
+          title: 'Error',
+          description: 'Failed to connect to call',
+          variant: 'destructive',
         });
       }
     };
@@ -125,28 +54,19 @@ export function CallInterface({
     initializeCall();
 
     return () => {
-      window.removeEventListener('remoteStreamUpdated', handleRemoteStream);
-      socket.off("call-offer");
-      socket.off("call-answer");
-      socket.off("ice-candidate");
-      socket.off("call_ended");
-      webrtcRef.current?.cleanup();
+      agoraRef.current?.leave();
     };
-  }, [socket, callId, isRepresentative, targetUserId, toast]);
+  }, [socket, targetUserId, callId]);
 
-  const toggleMute = () => {
-    const localStream = localAudioRef.current?.srcObject as MediaStream;
-    if (localStream) {
-      localStream.getAudioTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
+  const handleMuteToggle = async () => {
+    if (!agoraRef.current) return;
+    
+    try {
+      await agoraRef.current.muteAudio(!isMuted);
       setIsMuted(!isMuted);
+    } catch (error) {
+      console.error('Failed to toggle mute:', error);
     }
-  };
-
-  const handleEndCall = () => {
-    onEndCall?.();
-    webrtcRef.current?.cleanup();
   };
 
   return (
@@ -155,11 +75,11 @@ export function CallInterface({
         <div className="flex justify-center space-x-4">
           <Button
             variant={isMuted ? "destructive" : "outline"}
-            onClick={toggleMute}
+            onClick={handleMuteToggle}
           >
             {isMuted ? "Unmute" : "Mute"}
           </Button>
-          <Button variant="destructive" onClick={handleEndCall}>
+          <Button variant="destructive" onClick={onEndCall}>
             End Call
           </Button>
         </div>
@@ -169,9 +89,6 @@ export function CallInterface({
             Connecting call...
           </div>
         )}
-
-        <audio ref={localAudioRef} autoPlay muted />
-        <audio ref={remoteAudioRef} autoPlay />
       </CardContent>
     </Card>
   );
