@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Mic, MicOff, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/lib/api-client";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { WS_NAMESPACES } from "@/constants/websocket.constants";
+import { apiClient, axiosClient } from "@/lib/api-client";
+import { AgoraService } from "@/lib/agora-service";
+
 
 interface CallRecorderProps {
   callId: string;
@@ -22,10 +22,7 @@ export function CallRecorder({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const { toast } = useToast();
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null
-  );
-  const socket = useWebSocket(WS_NAMESPACES.CALLS);
+  const agoraRef = useRef<AgoraService | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -39,28 +36,23 @@ export function CallRecorder({
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-
-      console.log("recorder", recorder.state);
-      recorder.ondataavailable = async (event) => {
-        console.log("ondataavailable", event);
-        if (event.data.size > 0) {
-          // Send the audio data to the server via WebSocket
-          socket.socket?.emit("voiceData", {
-            callId,
-            data: event.data,
-          });
-        }
-      };
-
-      recorder.start(1000); // Collect data every second
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-
-      // Call the API to mark recording as started
+      // Start recording on the server
       await apiClient.post(`/calls/${callId}/recording/start`);
 
+      // Get Agora token
+      const response = await apiClient.get(`/calls/${callId}/token`);
+      if (!response.ok) throw new Error("Failed to get token");
+
+      const { token, channel } = await response.json();
+
+      // Initialize Agora recording client
+      agoraRef.current = new AgoraService();
+      await agoraRef.current.join(channel, token, callId);
+
+      // Start local recording
+      await agoraRef.current.startRecording();
+
+      setIsRecording(true);
       toast({
         title: "Recording Started",
         description: "Call is now being recorded",
@@ -76,26 +68,47 @@ export function CallRecorder({
   };
 
   const stopRecording = async () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-      setMediaRecorder(null);
-      setIsRecording(false);
+    try {
+      if (agoraRef.current) {
+        const recordingBlob = await agoraRef.current.stopRecording();
+        if (!recordingBlob) {
+          throw new Error("No recording data available");
+        }
+        setIsRecording(false);
+        setRecordingDuration(0);
 
-      try {
-        await apiClient.post(`/calls/${callId}/recording/stop`);
+        // Create form data with the recording file
+        const formData = new FormData();
+
+        formData.append("recording", recordingBlob);
+
+        // Use apiClient instead of fetch for consistency
+        const response = await axiosClient.post(
+          `/calls/${callId}/recording/stop`,
+          formData
+        );
+        if (response.status !== 200) {
+          throw new Error((response.data as any).message || "Failed to stop recording");
+        }
+
+        await agoraRef.current.leave();
+        agoraRef.current = null;
+
+        setIsRecording(false);
+        setRecordingDuration(0);
+
         toast({
           title: "Recording Stopped",
           description: "Call recording has been saved",
         });
-      } catch (error) {
-        console.error("Failed to stop recording:", error);
-        toast({
-          title: "Error",
-          description: "Failed to stop recording",
-          variant: "destructive",
-        });
       }
+    } catch (error: any) {
+      console.error("Failed to stop recording:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to stop recording",
+        variant: "destructive",
+      });
     }
   };
 

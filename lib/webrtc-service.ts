@@ -10,7 +10,21 @@ export class WebRTCService {
 
   constructor(socket: Socket) {
     this.socket = socket;
+    this.setupSocketReconnection();
     this.initializePeerConnection();
+  }
+
+  private setupSocketReconnection() {
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      setTimeout(() => {
+        this.socket.connect();
+      }, 1000);
+    });
+
+    this.socket.on('ping', () => {
+      this.socket.emit('pong');
+    });
   }
 
   private initializePeerConnection() {

@@ -42,20 +42,6 @@ export default function CustomerDashboard() {
   const { toast } = useToast();
   const [currentCall, setCurrentCall] = useState<Call | null>(null);
 
-  // Handle call socket events
-  useEffect(() => {
-    if (!callSocket.socket) return;
-
-    callSocket.socket.on("call-offer", async ({ fromUserId }) => {
-      console.log("Received call offer from representative:", fromUserId);
-      // The CallInterface component will handle the actual WebRTC signaling
-    });
-
-
-    return () => {
-      callSocket.socket?.off("call-offer");
-    };
-  }, [callSocket.socket, toast]);
 
   useEffect(() => {
     if (!queueSocket.socket) return;

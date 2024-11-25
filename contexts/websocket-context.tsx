@@ -25,13 +25,15 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     const token = Cookies.get('token');
     if (!token) return;
 
-    // Initialize all required sockets
     const newSockets: WebSocketContextType['sockets'] = {};
     Object.values(WS_NAMESPACES).forEach((namespace) => {
       const socket = io(`${process.env.NEXT_PUBLIC_WS_URL}/${namespace}`, {
-        extraHeaders: {
-          Authorization: `Bearer ${token}`,
+        auth: { 
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         },
+        transports: ['websocket'],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
@@ -42,9 +44,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         console.log(`Connected to ${namespace} namespace`);
       });
 
-      socket.on('disconnect', () => {
+      socket.on('connect_error', (error) => {
+        console.error(`Connection error for ${namespace}:`, error);
         setIsConnected(false);
-        console.log(`Disconnected from ${namespace} namespace`);
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.log(`Disconnected from ${namespace}:`, reason);
+        setIsConnected(false);
       });
 
       newSockets[namespace] = socket;
@@ -52,19 +59,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     setSockets(newSockets);
 
-    const DEBUG = process.env.NODE_ENV === 'development';
-
-    if (DEBUG) {
-      Object.entries(newSockets).forEach(([namespace, socket]) => {
-        socket?.onAny((event, ...args) => {
-          console.log(`[${namespace}] ${event}:`, args);
-        });
-      });
-    }
-
     return () => {
       Object.values(newSockets).forEach((socket) => {
-        socket?.disconnect();
+        if (socket?.connected) {
+          socket.disconnect();
+        }
       });
     };
   }, []);
