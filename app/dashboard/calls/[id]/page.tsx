@@ -8,9 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallSummary } from "@/components/calls/call-summary";
 import { NextSteps } from "@/components/calls/next-steps";
 import { CallNotes } from "@/components/calls/call-notes";
-import { CallRecorder } from "@/components/calls/call-recorder";
+import dynamic from "next/dynamic";
 import { apiClient } from "@/lib/api-client";
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from "date-fns";
 
 interface CallDetails {
   id: string;
@@ -33,6 +33,11 @@ interface CallDetails {
     timestamp: string;
   }>;
 }
+
+const CallRecorder = dynamic(
+  () => import("@/components/calls/call-recorder").then((mod) => mod.default),
+  { ssr: false }
+);
 
 export default function CallDetailsPage() {
   const { id } = useParams();
@@ -62,18 +67,14 @@ export default function CallDetailsPage() {
   }
 
   const getCallContext = () => {
-    return call.transcripts
-      .map((t) => `${t.speaker}: ${t.text}`)
-      .join('\n');
+    return call.transcripts.map((t) => `${t.speaker}: ${t.text}`).join("\n");
   };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Call Details</h1>
-        <Badge
-          variant={call.status === 'completed' ? 'default' : 'secondary'}
-        >
+        <Badge variant={call.status === "completed" ? "default" : "secondary"}>
           {call.status}
         </Badge>
       </div>
@@ -141,14 +142,14 @@ export default function CallDetailsPage() {
                 <div
                   key={index}
                   className={`flex items-start space-x-2 ${
-                    transcript.speaker === 'customer' ? 'justify-end' : ''
+                    transcript.speaker === "customer" ? "justify-end" : ""
                   }`}
                 >
                   <div
                     className={`max-w-[80%] p-2 rounded-lg ${
-                      transcript.speaker === 'customer'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-secondary'
+                      transcript.speaker === "customer"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary"
                     }`}
                   >
                     <p className="text-sm">{transcript.text}</p>
@@ -164,4 +165,4 @@ export default function CallDetailsPage() {
       </Tabs>
     </div>
   );
-} 
+}

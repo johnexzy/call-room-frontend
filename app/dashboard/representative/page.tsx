@@ -8,16 +8,23 @@ import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
 import { WS_NAMESPACES, WS_EVENTS } from "@/constants/websocket.constants";
-import { CallInterface } from "@/components/call/call-interface";
 import { SentimentAnalyzer } from "@/components/calls/sentiment-analyzer";
-import { CallRecorder } from "@/components/calls/call-recorder";
 import { NetworkStats } from "@/components/calls/network-stats";
 import { CallNotes } from "@/components/calls/call-notes";
 import { JourneyTimeline } from "@/components/customer/journey-timeline";
 import { KnowledgeBase } from "@/components/knowledge/knowledge-base";
 import { CallSummary } from "@/components/calls/call-summary";
 import { NextSteps } from "@/components/calls/next-steps";
+import dynamic from "next/dist/shared/lib/dynamic";
 
+const CallInterface = dynamic(
+  () => import("@/components/call/call-interface"),
+  { ssr: false }
+);
+const CallRecorder = dynamic(
+  () => import("@/components/calls/call-recorder").then((mod) => mod.default),
+  { ssr: false }
+);
 interface Call {
   id: string;
   customer: {
@@ -123,9 +130,11 @@ export default function RepresentativeDashboard() {
           description: "The call has ended successfully",
         });
       }
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      if (typeof window !== "undefined") {
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
     } catch (error) {
       console.error("Failed to end call:", error);
       toast({
@@ -194,7 +203,9 @@ export default function RepresentativeDashboard() {
 
             <div className="grid gap-6 md:grid-cols-2">
               <CallSummary callId={currentCall.id} />
-              <NextSteps context={`Customer: ${currentCall.customer.firstName} ${currentCall.customer.lastName}`} />
+              <NextSteps
+                context={`Customer: ${currentCall.customer.firstName} ${currentCall.customer.lastName}`}
+              />
             </div>
 
             <JourneyTimeline customerId={currentCall.customer.id} />

@@ -16,7 +16,7 @@ interface CallInterfaceProps {
   onEndCall?: () => void;
 }
 
-export function CallInterface({
+export default function CallInterface({
   callId,
   targetUserId,
   onEndCall,
