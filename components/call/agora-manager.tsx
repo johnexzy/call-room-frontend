@@ -156,26 +156,46 @@ export function AgoraManager({
   const handleStartRecording = async () => {
     try {
       await apiClient.post(`/calls/${callId}/recording/start`);
-      
+
       const audioContext = new AudioContext();
       const destination = audioContext.createMediaStreamDestination();
 
+      // Create a gain node for mixing audio
+      const mixedAudioNode = audioContext.createGain();
+      mixedAudioNode.connect(destination);
+
+      // Add local track
       if (localMicrophoneTrack) {
-        const localStream = new MediaStream([localMicrophoneTrack.getMediaStreamTrack()]);
+        const localStream = new MediaStream([
+          localMicrophoneTrack.getMediaStreamTrack(),
+        ]);
         const localSource = audioContext.createMediaStreamSource(localStream);
-        localSource.connect(destination);
+        localSource.connect(mixedAudioNode);
       }
 
-      remoteUsers.forEach(user => {
+      // Add remote tracks
+      remoteUsers.forEach((user) => {
         if (user.audioTrack) {
-          const remoteStream = new MediaStream([user.audioTrack.getMediaStreamTrack()]);
-          const remoteSource = audioContext.createMediaStreamSource(remoteStream);
-          remoteSource.connect(destination);
+          // Make sure remote track is playing
+          user.audioTrack.play();
+
+          // Get the audio element that Agora created
+          const audioElement = document.querySelector(
+            `[data-user-id="${user.uid}"]`
+          ) as HTMLAudioElement;
+          if (audioElement) {
+            const remoteSource = audioContext.createMediaStreamSource(
+              new MediaStream([
+                audioElement.srcObject as unknown as MediaStreamTrack,
+              ])
+            );
+            remoteSource.connect(mixedAudioNode);
+          }
         }
       });
 
       const mediaRecorder = new MediaRecorder(destination.stream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType: "audio/webm;codecs=opus",
       });
 
       // Clear previous chunks
@@ -183,14 +203,14 @@ export function AgoraManager({
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          setRecordingChunks(prev => [...prev, e.data]);
+          setRecordingChunks((prev) => [...prev, e.data]);
         }
       };
 
       // Request data every second
       mediaRecorder.start(1000);
       setIsRecording(true);
-      
+
       // Store the mediaRecorder instance
       (window as any).mediaRecorder = mediaRecorder;
 
@@ -216,10 +236,10 @@ export function AgoraManager({
       return new Promise<void>((resolve, reject) => {
         mediaRecorder.onstop = async () => {
           try {
-            const blob = new Blob(recordingChunks, { 
-              type: "audio/webm;codecs=opus" 
+            const blob = new Blob(recordingChunks, {
+              type: "audio/webm;codecs=opus",
             });
-            
+
             const formData = new FormData();
             formData.append("recording", blob, "recording.webm");
 
@@ -308,7 +328,9 @@ export function AgoraManager({
             {isConnected && (
               <>
                 <Button
-                  onClick={isRecording ? handleStopRecording : handleStartRecording}
+                  onClick={
+                    isRecording ? handleStopRecording : handleStartRecording
+                  }
                   variant={isRecording ? "destructive" : "default"}
                   disabled={!isConnected || isLoading}
                 >
