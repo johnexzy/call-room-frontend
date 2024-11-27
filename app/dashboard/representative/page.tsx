@@ -21,10 +21,10 @@ const CallInterface = dynamic(
   () => import("@/components/call/call-interface"),
   { ssr: false }
 );
-const CallRecorder = dynamic(
-  () => import("@/components/calls/call-recorder").then((mod) => mod.default),
-  { ssr: false }
-);
+// const CallRecorder = dynamic(
+//   () => import("@/components/calls/call-recorder").then((mod) => mod.default),
+//   { ssr: false }
+// );
 interface Call {
   id: string;
   customer: {
@@ -76,8 +76,8 @@ export default function RepresentativeDashboard() {
       }
 
       if (activeCallResponse.ok) {
-        const activeCall = await activeCallResponse.json();
-        setCurrentCall(activeCall);
+        // const activeCall = await activeCallResponse.json();
+        // setCurrentCall(activeCall);
       }
     } catch (error) {
       // console.error("Failed to load initial data:", error);
@@ -193,7 +193,6 @@ export default function RepresentativeDashboard() {
                 callId={currentCall.id}
                 targetUserId={currentCall.customer.id}
                 onEndCall={handleEndCall}
-                isRepresentative={true}
               />
               <div className="space-y-6">
                 <SentimentAnalyzer callId={currentCall.id} />
@@ -211,7 +210,7 @@ export default function RepresentativeDashboard() {
             <JourneyTimeline customerId={currentCall.customer.id} />
 
             <div className="grid gap-6 md:grid-cols-2">
-              <CallRecorder callId={currentCall.id} isActive={true} />
+              {/* <CallRecorder callId={currentCall.id} isActive={true} /> */}
               <CallNotes callId={currentCall.id} isActive={true} />
             </div>
           </div>

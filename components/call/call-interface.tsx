@@ -1,95 +1,67 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { WS_NAMESPACES } from "@/constants/websocket.constants";
-import { useToast } from "@/hooks/use-toast";
-import { AgoraService } from '@/lib/agora-service';
-import { apiClient } from '@/lib/api-client';
+import { toast } from "@/hooks/use-toast";
+import { AgoraVoiceChat } from "./agora-voice-chat";
+import { apiClient } from "@/lib/api-client";
+import { useEffect, useState } from "react";
+import { JoinConfig } from "@/types";
 
 interface CallInterfaceProps {
   callId: string;
-  isRepresentative?: boolean;
-  targetUserId?: string;
+  targetUserId: string;
   onEndCall?: () => void;
 }
+
 
 export default function CallInterface({
   callId,
   targetUserId,
   onEndCall,
 }: Readonly<CallInterfaceProps>) {
-  const [isMuted, setIsMuted] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(true);
-  const agoraRef = useRef<AgoraService | null>(null);
-  const { socket } = useWebSocket(WS_NAMESPACES.CALLS);
-  const { toast } = useToast();
+  const [joinConfig, setJoinConfig] = useState<JoinConfig>();
 
   useEffect(() => {
-    if (!socket?.connected || !targetUserId) return;
-
-    const initializeCall = async () => {
+    const getToken = async () => {
       try {
-        // Get token from your backend
         const response = await apiClient.get(`/calls/${callId}/token`);
-        if (!response.ok) throw new Error('Failed to get token');
-        
-        const { token, channel } = await response.json();
-        
-        agoraRef.current = new AgoraService();
-        await agoraRef.current.join(channel, token, targetUserId);
-        setIsConnecting(false);
+        if (!response.ok) throw new Error("Failed to get token");
+        const { token, uid, channel } = await response.json();
+  
+        if (!process.env.NEXT_PUBLIC_AGORA_APP_ID) {
+          throw new Error("Agora App ID not configured");
+        }
+        console.clear();
+        console.log("token", token);
+        console.log("uid", uid);
+  
+        setJoinConfig({
+          appid: process.env.NEXT_PUBLIC_AGORA_APP_ID,
+          channel,
+          token,
+          uid,
+        });
       } catch (error) {
-        console.error('Failed to initialize call:', error);
+        console.error("Failed to get token:", error);
         toast({
-          title: 'Error',
-          description: 'Failed to connect to call',
-          variant: 'destructive',
+          title: "Error",
+          description: "Failed to get connection token",
+          variant: "destructive",
         });
       }
     };
-
-    initializeCall();
-
-    return () => {
-      agoraRef.current?.leave();
-    };
-  }, [socket, targetUserId, callId]);
-
-  const handleMuteToggle = async () => {
-    if (!agoraRef.current) return;
-    
-    try {
-      await agoraRef.current.muteAudio(!isMuted);
-      setIsMuted(!isMuted);
-    } catch (error) {
-      console.error('Failed to toggle mute:', error);
-    }
-  };
+    getToken();
+  }, [callId]);
 
   return (
-    <Card>
-      <CardContent className="p-6 space-y-4">
-        <div className="flex justify-center space-x-4">
-          <Button
-            variant={isMuted ? "destructive" : "outline"}
-            onClick={handleMuteToggle}
-          >
-            {isMuted ? "Unmute" : "Mute"}
-          </Button>
-          <Button variant="destructive" onClick={onEndCall}>
-            End Call
-          </Button>
-        </div>
-
-        {isConnecting && (
-          <div className="text-center text-muted-foreground">
-            Connecting call...
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <>
+      {joinConfig ? (
+        <AgoraVoiceChat
+          callId={callId}
+          userId={targetUserId}
+          onCallEnd={onEndCall}
+          joinConfig={joinConfig}
+        />
+      ) : null}
+    </>
   );
 }
