@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Mic, MicOff, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient, axiosClient } from "@/lib/api-client";
-import { AgoraService } from "@/lib/agora-service";
-
+import { useAgora } from "@/contexts/agora-context";
 
 interface CallRecorderProps {
   callId: string;
@@ -22,7 +21,7 @@ export default function CallRecorder({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const { toast } = useToast();
-  const agoraRef = useRef<AgoraService | null>(null);
+  const { joinCall, leaveCall, startRecording, stopRecording } = useAgora();
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -34,23 +33,11 @@ export default function CallRecorder({
     return () => clearInterval(interval);
   }, [isRecording]);
 
-  const startRecording = async () => {
+  const handleStartRecording = async () => {
     try {
-      // Start recording on the server
       await apiClient.post(`/calls/${callId}/recording/start`);
-
-      // Get Agora token
-      const response = await apiClient.get(`/calls/${callId}/token`);
-      if (!response.ok) throw new Error("Failed to get token");
-
-      const { token, channel } = await response.json();
-
-      // Initialize Agora recording client
-      agoraRef.current = new AgoraService();
-      await agoraRef.current.join(channel, token, callId);
-
-      // Start local recording
-      await agoraRef.current.startRecording();
+      await joinCall(callId);
+      await startRecording();
 
       setIsRecording(true);
       toast({
@@ -67,41 +54,36 @@ export default function CallRecorder({
     }
   };
 
-  const stopRecording = async () => {
+  const handleStopRecording = async () => {
     try {
-      if (agoraRef.current) {
-        const recordingBlob = await agoraRef.current.stopRecording();
-        if (!recordingBlob) {
-          throw new Error("No recording data available");
-        }
-        setIsRecording(false);
-        setRecordingDuration(0);
-
-        // Create form data with the recording file
-        const formData = new FormData();
-
-        formData.append("recording", recordingBlob);
-
-        // Use apiClient instead of fetch for consistency
-        const response = await axiosClient.post(
-          `/calls/${callId}/recording/stop`,
-          formData
-        );
-        if (response.status !== 200) {
-          throw new Error((response.data as any).message || "Failed to stop recording");
-        }
-
-        await agoraRef.current.leave();
-        agoraRef.current = null;
-
-        setIsRecording(false);
-        setRecordingDuration(0);
-
-        toast({
-          title: "Recording Stopped",
-          description: "Call recording has been saved",
-        });
+      const recordingBlob = await stopRecording();
+      if (!recordingBlob) {
+        throw new Error("No recording data available");
       }
+
+      const formData = new FormData();
+      formData.append("recording", recordingBlob);
+
+      const response = await axiosClient.post(
+        `/calls/${callId}/recording/stop`,
+        formData
+      );
+
+      if (![200, 201, 204].includes(response.status)) {
+        throw new Error(
+          (response.data as { message?: string })?.message ||
+            "Failed to stop recording"
+        );
+      }
+
+      await leaveCall();
+      setIsRecording(false);
+      setRecordingDuration(0);
+
+      toast({
+        title: "Recording Stopped",
+        description: "Call recording has been saved",
+      });
     } catch (error: any) {
       console.error("Failed to stop recording:", error);
       toast({
@@ -166,7 +148,7 @@ export default function CallRecorder({
       <CardContent className="space-y-4">
         <div className="flex space-x-2">
           <Button
-            onClick={isRecording ? stopRecording : startRecording}
+            onClick={isRecording ? handleStopRecording : handleStartRecording}
             variant={isRecording ? "destructive" : "default"}
             className="flex-1"
           >

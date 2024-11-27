@@ -47,6 +47,30 @@ export default function CustomerDashboard() {
   const [currentCall, setCurrentCall] = useState<Call | null>(null);
 
   useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    try {
+      const [profileResponse] = await Promise.all([
+        apiClient.get("/users/profile"),
+      ]);
+
+      if (profileResponse.ok) {
+        const profile = await profileResponse.json();
+        console.log("profile", profile);
+      }
+    } catch (error) {
+      console.error("Failed to load initial data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive",
+      });
+    }
+  };
+  useEffect(() => {
+
     if (!queueSocket.socket) return;
 
     queueSocket.socket.on(WS_EVENTS.QUEUE.POSITION_UPDATE, (data) => {
@@ -81,6 +105,13 @@ export default function CustomerDashboard() {
       queueSocket.socket?.off(WS_EVENTS.QUEUE.YOUR_TURN);
     };
   }, [queueSocket.socket, toast]);
+  useEffect(() => {
+    if (!callSocket.socket) return;
+
+    callSocket.socket.on(WS_EVENTS.CALLS.CALL_ENDED, () => {
+      handleCallEnd();
+    });
+  }, [callSocket.socket]);
 
   const joinQueue = async () => {
     try {
