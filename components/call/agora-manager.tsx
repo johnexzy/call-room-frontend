@@ -78,6 +78,7 @@ export function AgoraManager({
   const [isMuted, setIsMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recordingChunks, setRecordingChunks] = useState<BlobPart[]>([]);
 
   const remoteUsers = useRemoteUsers();
 
@@ -156,7 +157,6 @@ export function AgoraManager({
     try {
       await apiClient.post(`/calls/${callId}/recording/start`);
       
-      // Start local recording using the Agora tracks
       const audioContext = new AudioContext();
       const destination = audioContext.createMediaStreamDestination();
 
@@ -174,14 +174,21 @@ export function AgoraManager({
         }
       });
 
-      const mediaRecorder = new MediaRecorder(destination.stream);
-      const chunks: BlobPart[] = [];
+      const mediaRecorder = new MediaRecorder(destination.stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+
+      // Clear previous chunks
+      setRecordingChunks([]);
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
+        if (e.data.size > 0) {
+          setRecordingChunks(prev => [...prev, e.data]);
+        }
       };
 
-      mediaRecorder.start();
+      // Request data every second
+      mediaRecorder.start(1000);
       setIsRecording(true);
       
       // Store the mediaRecorder instance
@@ -209,11 +216,12 @@ export function AgoraManager({
       return new Promise<void>((resolve, reject) => {
         mediaRecorder.onstop = async () => {
           try {
-            const chunks = (window as any).recordingChunks || [];
-            const blob = new Blob(chunks, { type: "audio/webm;codecs=opus" });
+            const blob = new Blob(recordingChunks, { 
+              type: "audio/webm;codecs=opus" 
+            });
             
             const formData = new FormData();
-            formData.append("recording", blob);
+            formData.append("recording", blob, "recording.webm");
 
             const response = await axiosClient.post(
               `/calls/${callId}/recording/stop`,
@@ -226,7 +234,7 @@ export function AgoraManager({
 
             setIsRecording(false);
             setRecordingDuration(0);
-            (window as any).recordingChunks = [];
+            setRecordingChunks([]);
             (window as any).mediaRecorder = null;
 
             toast({
