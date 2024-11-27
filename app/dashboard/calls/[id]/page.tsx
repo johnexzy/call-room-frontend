@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallSummary } from "@/components/calls/call-summary";
 import { NextSteps } from "@/components/calls/next-steps";
 import { CallNotes } from "@/components/calls/call-notes";
-import dynamic from "next/dynamic";
+// import dynamic from "next/dynamic";
 import { apiClient } from "@/lib/api-client";
 import { formatDistanceToNow } from "date-fns";
 
@@ -34,10 +34,10 @@ interface CallDetails {
   }>;
 }
 
-const CallRecorder = dynamic(
-  () => import("@/components/calls/call-recorder").then((mod) => mod.default),
-  { ssr: false }
-);
+// const CallRecorder = dynamic(
+//   () => import("@/components/calls/call-recorder").then((mod) => mod.default),
+//   { ssr: false }
+// );
 
 export default function CallDetailsPage() {
   const { id } = useParams();
@@ -124,9 +124,9 @@ export default function CallDetailsPage() {
           <NextSteps context={getCallContext()} />
         </TabsContent>
 
-        <TabsContent value="recording">
+        {/* <TabsContent value="recording">
           <CallRecorder callId={call.id} isActive={false} />
-        </TabsContent>
+        </TabsContent> */}
 
         <TabsContent value="notes">
           <CallNotes callId={call.id} isActive={false} />
