@@ -33,7 +33,7 @@ interface AgoraContextType {
 
 interface AgoraManagerProps {
   callId: string;
-  userId: string;
+  isRep: boolean;
   onCallEnd?: () => void;
   joinConfig: JoinConfig;
 }
@@ -65,6 +65,7 @@ export function AgoraManager({
   callId,
   onCallEnd,
   joinConfig,
+  isRep,
 }: Readonly<AgoraManagerProps>) {
   const agoraEngine = useRTCClient();
 
@@ -116,6 +117,9 @@ export function AgoraManager({
 
   const handleEndCall = useCallback(async () => {
     try {
+      if (isRecording) {
+        await handleStopRecording();
+      }
       if (localMicrophoneTrack) {
         localMicrophoneTrack.close();
       }
@@ -129,7 +133,7 @@ export function AgoraManager({
         variant: "destructive",
       });
     }
-  }, [agoraEngine, localMicrophoneTrack, onCallEnd, toast]);
+  }, [agoraEngine, localMicrophoneTrack, onCallEnd, toast, isRecording]);
 
   useClientEvent(agoraEngine, "volume-indicator", (volumes) => {
     volumes.forEach((volume) => {
@@ -285,6 +289,14 @@ export function AgoraManager({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  useEffect(() => {
+    if (isConnected && isRep) {
+      setTimeout(() => {
+        handleStartRecording();
+      }, 1000);
+    }
+  }, [isConnected, isRep]);
+
   return (
     <AgoraProvider localMicrophoneTrack={localMicrophoneTrack}>
       <Card>
@@ -317,7 +329,7 @@ export function AgoraManager({
               End Call
             </Button>
 
-            {isConnected && (
+            {isConnected && isRep && (
               <div className="text-center text-muted-foreground">
                 {participants.length} participants
               </div>
@@ -325,7 +337,7 @@ export function AgoraManager({
           </div>
 
           <div className="flex justify-center space-x-4">
-            {isConnected && (
+            {isConnected && isRep && (
               <>
                 <Button
                   onClick={

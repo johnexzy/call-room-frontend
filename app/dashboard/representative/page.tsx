@@ -76,8 +76,8 @@ export default function RepresentativeDashboard() {
       }
 
       if (activeCallResponse.ok) {
-        // const activeCall = await activeCallResponse.json();
-        // setCurrentCall(activeCall);
+        const activeCall = await activeCallResponse.json();
+        setCurrentCall(activeCall);
       }
     } catch (error) {
       // console.error("Failed to load initial data:", error);
@@ -129,11 +129,6 @@ export default function RepresentativeDashboard() {
           title: "Call Ended",
           description: "The call has ended successfully",
         });
-      }
-      if (typeof window !== "undefined") {
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
       }
     } catch (error) {
       console.error("Failed to end call:", error);
@@ -191,6 +186,7 @@ export default function RepresentativeDashboard() {
             <div className="grid gap-6 md:grid-cols-2">
               <CallInterface
                 callId={currentCall.id}
+                isRep={true}
                 targetUserId={currentCall.customer.id}
                 onEndCall={handleEndCall}
               />

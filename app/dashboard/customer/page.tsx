@@ -109,7 +109,7 @@ export default function CustomerDashboard() {
     if (!callSocket.socket) return;
 
     callSocket.socket.on(WS_EVENTS.CALLS.CALL_ENDED, () => {
-      handleCallEnd();
+      handleEndCall();
     });
   }, [callSocket.socket]);
 
@@ -134,16 +134,28 @@ export default function CustomerDashboard() {
     }
   };
 
-  const handleCallEnd = async () => {
-    setCurrentCall(null);
-    toast({
-      title: "Call Ended",
-      description: "The call has been ended by the representative.",
-    });
+  const handleEndCall = async () => {
+    if (!currentCall) return;
 
-    setTimeout(() => {
-      window.location.reload();
-    }, 1500);
+    try {
+      const response = await apiClient.put(`/calls/${currentCall.id}/end`, {
+        notes: "",
+      });
+      if (response.ok) {
+        setCurrentCall(null);
+        toast({
+          title: "Call Ended",
+          description: "The call has ended successfully",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to end call:", error);
+      toast({
+        title: "Error",
+        description: "Failed to end call",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -163,8 +175,9 @@ export default function CustomerDashboard() {
           </Card>
           <CallInterface
             callId={currentCall.id}
+            isRep={false}
             targetUserId={currentCall.representative.id}
-            onEndCall={handleCallEnd}
+            onEndCall={handleEndCall}
           />
         </div>
       ) : !isInQueue ? (

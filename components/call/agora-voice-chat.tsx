@@ -13,12 +13,14 @@ import { useMemo } from 'react';
 interface AgoraVoiceChatProps {
   callId: string;
   userId: string;
+  isRep: boolean;
   onCallEnd?: () => void;
   joinConfig: JoinConfig;
 }
 
 export function AgoraVoiceChat({
   callId,
+  isRep,
   userId,
   onCallEnd,
   joinConfig,
@@ -40,7 +42,7 @@ export function AgoraVoiceChat({
     <AgoraRTCProvider client={agoraEngine}>
       <AgoraManager
         callId={callId}
-        userId={userId}
+        isRep={isRep}
         onCallEnd={onCallEnd}
         joinConfig={joinConfig}
       />
