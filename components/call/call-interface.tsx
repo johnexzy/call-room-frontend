@@ -9,6 +9,7 @@ import { JoinConfig } from "@/types";
 interface CallInterfaceProps {
   callId: string;
   targetUserId: string;
+  isRep: boolean;
   onEndCall?: () => void;
 }
 
@@ -16,6 +17,7 @@ interface CallInterfaceProps {
 export default function CallInterface({
   callId,
   targetUserId,
+  isRep,
   onEndCall,
 }: Readonly<CallInterfaceProps>) {
   const [joinConfig, setJoinConfig] = useState<JoinConfig>();
@@ -57,6 +59,7 @@ export default function CallInterface({
       {joinConfig ? (
         <AgoraVoiceChat
           callId={callId}
+          isRep={isRep}
           userId={targetUserId}
           onCallEnd={onEndCall}
           joinConfig={joinConfig}
