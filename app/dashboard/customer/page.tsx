@@ -109,7 +109,7 @@ export default function CustomerDashboard() {
     if (!callSocket.socket) return;
 
     callSocket.socket.on(WS_EVENTS.CALLS.CALL_ENDED, () => {
-      handleEndCall();
+      setCurrentCall(null);
     });
   }, [callSocket.socket]);
 

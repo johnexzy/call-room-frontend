@@ -24,7 +24,7 @@ import { Mic, MicOff, PhoneOff } from "lucide-react";
 import { JoinConfig } from "@/types";
 import { IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import { Badge } from "@/components/ui/badge";
-import { apiClient, axiosClient } from "@/lib/api-client";
+import { axiosClient } from "@/lib/api-client";
 
 interface AgoraContextType {
   localMicrophoneTrack: IMicrophoneAudioTrack | null;
@@ -79,7 +79,8 @@ export function AgoraManager({
   const [isMuted, setIsMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordingChunks, setRecordingChunks] = useState<BlobPart[]>([]);
+  const [recordingResourceId, setRecordingResourceId] = useState<string | null>(null);
+  const [recordingSid, setRecordingSid] = useState<string | null>(null);
 
   const remoteUsers = useRemoteUsers();
 
@@ -159,64 +160,18 @@ export function AgoraManager({
 
   const handleStartRecording = async () => {
     try {
-      await apiClient.post(`/calls/${callId}/recording/start`);
-
-      const audioContext = new AudioContext();
-      const destination = audioContext.createMediaStreamDestination();
-
-      // Create a gain node for mixing audio
-      const mixedAudioNode = audioContext.createGain();
-      mixedAudioNode.connect(destination);
-
-      // Add local track
-      if (localMicrophoneTrack) {
-        const localStream = new MediaStream([
-          localMicrophoneTrack.getMediaStreamTrack(),
-        ]);
-        const localSource = audioContext.createMediaStreamSource(localStream);
-        localSource.connect(mixedAudioNode);
-      }
-
-      // Add remote tracks
-      remoteUsers.forEach((user) => {
-        if (user.audioTrack) {
-          // Make sure remote track is playing
-          user.audioTrack.play();
-
-          // Get the audio element that Agora created
-          const audioElement = document.querySelector(
-            `[data-user-id="${user.uid}"]`
-          ) as HTMLAudioElement;
-          if (audioElement) {
-            const remoteSource = audioContext.createMediaStreamSource(
-              new MediaStream([
-                audioElement.srcObject as unknown as MediaStreamTrack,
-              ])
-            );
-            remoteSource.connect(mixedAudioNode);
-          }
-        }
-      });
-
-      const mediaRecorder = new MediaRecorder(destination.stream, {
-        mimeType: "audio/webm;codecs=opus",
-      });
-
-      // Clear previous chunks
-      setRecordingChunks([]);
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          setRecordingChunks((prev) => [...prev, e.data]);
-        }
+      const response = await axiosClient.post(
+        `/calls/${callId}/recording/start`
+      );
+      const { resourceId, sid } = response.data as {
+        resourceId: string;
+        sid: string;
       };
 
-      // Request data every second
-      mediaRecorder.start(1000);
+      // Clear previous chunks
       setIsRecording(true);
-
-      // Store the mediaRecorder instance
-      (window as any).mediaRecorder = mediaRecorder;
+      setRecordingResourceId(resourceId);
+      setRecordingSid(sid);
 
       toast({
         title: "Recording Started",
@@ -234,44 +189,20 @@ export function AgoraManager({
 
   const handleStopRecording = async () => {
     try {
-      const mediaRecorder = (window as any).mediaRecorder;
-      if (!mediaRecorder) throw new Error("No recording in progress");
+      const response = await axiosClient.post(
+        `/calls/${callId}/recording/stop`,
+        { resourceId: recordingResourceId, sid: recordingSid }
+      );
 
-      return new Promise<void>((resolve, reject) => {
-        mediaRecorder.onstop = async () => {
-          try {
-            const blob = new Blob(recordingChunks, {
-              type: "audio/webm;codecs=opus",
-            });
+      if (![200, 201, 204].includes(response.status)) {
+        throw new Error("Failed to save recording");
+      }
 
-            const formData = new FormData();
-            formData.append("recording", blob, "recording.webm");
+      setIsRecording(false);
 
-            const response = await axiosClient.post(
-              `/calls/${callId}/recording/stop`,
-              formData
-            );
-
-            if (![200, 201, 204].includes(response.status)) {
-              throw new Error("Failed to save recording");
-            }
-
-            setIsRecording(false);
-            setRecordingDuration(0);
-            setRecordingChunks([]);
-            (window as any).mediaRecorder = null;
-
-            toast({
-              title: "Recording Stopped",
-              description: "Call recording has been saved",
-            });
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        };
-
-        mediaRecorder.stop();
+      toast({
+        title: "Recording Stopped",
+        description: "Call recording has been saved",
       });
     } catch (error: any) {
       console.error("Failed to stop recording:", error);
@@ -293,7 +224,7 @@ export function AgoraManager({
     if (isConnected && isRep) {
       setTimeout(() => {
         handleStartRecording();
-      }, 1000);
+      }, 2000);
     }
   }, [isConnected, isRep]);
 
