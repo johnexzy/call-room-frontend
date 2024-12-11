@@ -1,5 +1,6 @@
 import { NavigationBar } from "@/components/navigation-bar";
 import { WebSocketProvider } from "@/contexts/websocket-context";
+import { AuthProvider } from "@/contexts/auth-context";
 
 export default function DashboardLayout({
   children,
@@ -8,10 +9,12 @@ export default function DashboardLayout({
 }>) {
   return (
     <div className="min-h-screen bg-background">
-      <WebSocketProvider>
-        <NavigationBar />
-        <main>{children}</main>
-      </WebSocketProvider>
+      <AuthProvider>
+        <WebSocketProvider>
+          <NavigationBar />
+          <main>{children}</main>
+        </WebSocketProvider>
+      </AuthProvider>
     </div>
   );
 }

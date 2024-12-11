@@ -8,36 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallSummary } from "@/components/calls/call-summary";
 import { NextSteps } from "@/components/calls/next-steps";
 import { CallNotes } from "@/components/calls/call-notes";
-// import dynamic from "next/dynamic";
 import { apiClient } from "@/lib/api-client";
 import { formatDistanceToNow } from "date-fns";
+import { CallRecording } from "@/components/calls/call-recording";
+import { CallDetails } from "@/types";
 
-interface CallDetails {
-  id: string;
-  customer: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  };
-  representative: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  };
-  startTime: string;
-  endTime?: string;
-  status: string;
-  transcripts: Array<{
-    text: string;
-    speaker: string;
-    timestamp: string;
-  }>;
-}
-
-// const CallRecorder = dynamic(
-//   () => import("@/components/calls/call-recorder").then((mod) => mod.default),
-//   { ssr: false }
-// );
 
 export default function CallDetailsPage() {
   const { id } = useParams();
@@ -107,13 +82,12 @@ export default function CallDetailsPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="summary" className="space-y-4">
+      <Tabs defaultValue="recording" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="recording">Recording</TabsTrigger>
           <TabsTrigger value="summary">AI Summary</TabsTrigger>
           <TabsTrigger value="suggestions">AI Suggestions</TabsTrigger>
-          <TabsTrigger value="recording">Recording</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
-          <TabsTrigger value="transcript">Transcript</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary">
@@ -124,44 +98,15 @@ export default function CallDetailsPage() {
           <NextSteps context={getCallContext()} />
         </TabsContent>
 
-        {/* <TabsContent value="recording">
-          <CallRecorder callId={call.id} isActive={false} />
-        </TabsContent> */}
+        <TabsContent value="recording">
+          <CallRecording call={call} />
+        </TabsContent>
 
         <TabsContent value="notes">
           <CallNotes callId={call.id} isActive={false} />
         </TabsContent>
 
-        <TabsContent value="transcript">
-          <Card>
-            <CardHeader>
-              <CardTitle>Call Transcript</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {call.transcripts.map((transcript, index) => (
-                <div
-                  key={index}
-                  className={`flex items-start space-x-2 ${
-                    transcript.speaker === "customer" ? "justify-end" : ""
-                  }`}
-                >
-                  <div
-                    className={`max-w-[80%] p-2 rounded-lg ${
-                      transcript.speaker === "customer"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary"
-                    }`}
-                  >
-                    <p className="text-sm">{transcript.text}</p>
-                    <span className="text-xs opacity-70">
-                      {new Date(transcript.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
+
       </Tabs>
     </div>
   );
