@@ -12,3 +12,26 @@ export interface JoinConfig {
   uid: string;
 }
     
+export interface CallDetails {
+  id: string;
+  customer: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+  representative: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+  startTime: string;
+  endTime?: string;
+  recordingUrl: string;
+  recordingStatus: string;
+  status: string;
+  transcripts: Array<{
+    text: string;
+    speaker: string;
+    timestamp: string;
+  }>;
+}

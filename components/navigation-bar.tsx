@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import Cookies from 'js-cookie';
+import { useAuth } from '@/hooks/use-auth';
 
 export function NavigationBar() {
   const router = useRouter();
   const pathname = usePathname();
+  const { user } = useAuth();
 
   const handleLogout = () => {
     Cookies.remove('token');
@@ -17,11 +19,22 @@ export function NavigationBar() {
     router.push('/login');
   };
 
-  const navItems = [
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/dashboard/calls', label: 'Call History' },
-    { href: '/dashboard/settings', label: 'Settings' },
-  ];
+  const getNavItems = () => {
+    const items = [
+      { href: '/dashboard', label: 'Dashboard' },
+    ];
+
+    // Only show Call History to reps and admins
+    if (user?.role === 'representative' || user?.role === 'admin') {
+      items.push({ href: '/dashboard/calls', label: 'Call History' });
+    }
+
+    items.push({ href: '/dashboard/settings', label: 'Settings' });
+
+    return items;
+  };
+
+  const navItems = getNavItems();
 
   return (
     <nav className="border-b">

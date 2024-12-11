@@ -39,7 +39,7 @@ export function CallSummary({ callId }: CallSummaryProps) {
   };
 
   useEffect(() => {
-    // loadSummary();
+    loadSummary();
   }, [callId]);
 
   const getSentimentColor = (sentiment: string) => {
