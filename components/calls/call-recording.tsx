@@ -1,32 +1,64 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiClient } from "@/lib/api-client";
+import { axiosClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { PlayIcon, PauseIcon, DownloadIcon } from "lucide-react";
+import { PlayIcon, PauseIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { CallDetails } from "@/types";
+import { Spinner } from "@/components/ui/spinner";
 
 interface CallRecordingProps {
   call: CallDetails;
 }
 
+interface RecordingState {
+  url: string | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
 export function CallRecording({ call }: Readonly<CallRecordingProps>) {
   const transcript = call.transcripts;
-  const [recordingUrl, setRecordingUrl] = useState<string | null>(
-    call.recordingUrl
-  );
+  const [recordingState, setRecordingState] = useState<RecordingState>({
+    url: call.recordingUrl,
+    isLoading: false,
+    error: null,
+  });
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  useEffect(() => {
+    // Update URL when call prop changes
+    setRecordingState((prev) => ({ ...prev, url: call.recordingUrl }));
+  }, [call.recordingUrl]);
+
+  const handleError = (error: unknown, action: string) => {
+    console.error(`${action} error:`, error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred";
+    toast({
+      title: `${action} Error`,
+      description: errorMessage,
+      variant: "destructive",
+    });
+    setRecordingState((prev) => ({ ...prev, error: errorMessage }));
+  };
+
   const handlePlayPause = async () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || recordingState.isLoading) return;
 
     try {
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
+        setRecordingState((prev) => ({
+          ...prev,
+          isLoading: true,
+          error: null,
+        }));
         // Try to play, this will fail if the URL is expired
         const playPromise = audioRef.current.play();
         if (playPromise) {
@@ -40,28 +72,30 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
         }
       }
     } catch (error) {
-      console.error("Playback error:", error);
-      toast({
-        title: "Playback Error",
-        description: "Failed to play the recording. Please try again.",
-        variant: "destructive",
-      });
+      handleError(error, "Playback");
+    } finally {
+      setRecordingState((prev) => ({ ...prev, isLoading: false }));
     }
   };
 
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      const response = await apiClient.get(
-        `/calls/${call.id}/recording/download-wav`,
-        { responseType: 'blob' }
-      );
-      
-      if (!response.ok) throw new Error('Failed to download recording');
+      setRecordingState((prev) => ({ ...prev, error: null }));
 
-      const blob = await response.blob();
+      const response = await axiosClient.get<Blob>(
+        `/calls/${call.id}/recording`,
+        {
+          responseType: "blob",
+          params: {
+            download: "true",
+          },
+        }
+      );
+
+      const blob = new Blob([response.data as BlobPart], { type: "audio/wav" });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `call-recording-${call.id}.wav`;
       document.body.appendChild(a);
@@ -69,12 +103,7 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error("Download error:", error);
-      toast({
-        title: "Download Error",
-        description: "Failed to download the recording. Please try again.",
-        variant: "destructive",
-      });
+      handleError(error, "Download");
     } finally {
       setIsDownloading(false);
     }
@@ -82,80 +111,117 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
 
   const refreshUrl = async () => {
     try {
-      const response = await apiClient.post(
-        `/calls/${call.id}/recording/refresh-wav`
-      );
-      if (response.ok) {
-        const newUrl = await response.text();
-        setRecordingUrl(newUrl);
+      setIsRefreshing(true);
+      setRecordingState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-        // If audio element exists, update its source and play
-        if (audioRef.current) {
-          audioRef.current.src = newUrl;
-          await audioRef.current.play();
-          setIsPlaying(true);
-        }
-      } else {
-        throw new Error("Failed to refresh URL");
+      const response = await axiosClient.post<{ url: string }>(
+        `/calls/${call.id}/recording/refresh`
+      );
+      const newUrl = response.data.url;
+      setRecordingState((prev) => ({ ...prev, url: newUrl }));
+
+      // If audio element exists, update its source and play
+      if (audioRef.current) {
+        audioRef.current.src = newUrl;
+        await audioRef.current.play();
+        setIsPlaying(true);
       }
     } catch (error) {
-      console.error("URL refresh error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to refresh the recording URL. Please try again.",
-        variant: "destructive",
-      });
+      handleError(error, "URL refresh");
+    } finally {
+      setIsRefreshing(false);
+      setRecordingState((prev) => ({ ...prev, isLoading: false }));
     }
   };
+
+  const isLoading = recordingState.isLoading || isDownloading || isRefreshing;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Live Transcript</CardTitle>
+        <CardTitle>Call Recording & Transcript</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {recordingUrl && (
+        {recordingState.error && (
+          <div className="text-sm text-red-500 mb-2">
+            {recordingState.error}
+          </div>
+        )}
+
+        {recordingState.url && (
           <div className="flex items-center space-x-2 mb-4">
             <audio
               ref={audioRef}
-              src={recordingUrl}
+              src={recordingState.url}
               onEnded={() => setIsPlaying(false)}
+              onError={() => {
+                setIsPlaying(false);
+                setRecordingState((prev) => ({
+                  ...prev,
+                  error: "Failed to load audio. Try refreshing the URL.",
+                }));
+              }}
             />
             <Button
               variant="outline"
               size="icon"
               onClick={handlePlayPause}
+              disabled={isLoading}
               className="h-8 w-8"
             >
-              {isPlaying ? (
+              {isLoading ? (
+                <Spinner className="h-4 w-4" />
+              ) : isPlaying ? (
                 <PauseIcon className="h-4 w-4" />
               ) : (
                 <PlayIcon className="h-4 w-4" />
               )}
             </Button>
-            <span className="text-sm text-muted-foreground">
-              {isPlaying ? "Playing" : "Paused"}
+            <span className="text-sm text-muted-foreground min-w-[60px]">
+              {isLoading ? "Loading..." : isPlaying ? "Playing" : "Paused"}
             </span>
             <Button
               variant="outline"
               size="icon"
               onClick={handleDownload}
-              disabled={isDownloading}
-              className="h-8 w-8 ml-2"
+              disabled={isLoading}
+              className="h-8 w-8"
             >
-              <DownloadIcon className="h-4 w-4" />
+              {isDownloading ? (
+                <Spinner className="h-4 w-4" />
+              ) : (
+                <DownloadIcon className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={refreshUrl}
+              disabled={isLoading}
+              className="h-8 w-8"
+            >
+              <RefreshCwIcon
+                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
             </Button>
           </div>
         )}
-        <div className="h-[300px] overflow-y-auto space-y-2">
-          {transcript.map((entry, index) => (
-            <div key={index} className="text-sm">
-              <span className="text-muted-foreground">
-                {new Date(entry.timestamp).toLocaleTimeString()}:
-              </span>
-              <span className="ml-2">{entry.text}</span>
+
+        <div className="h-[300px] overflow-y-auto space-y-2 border rounded-md p-4">
+          {transcript.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-4">
+              No transcript available yet
             </div>
-          ))}
+          ) : (
+            transcript.map((entry, index) => (
+              <div key={index} className="text-sm">
+                <span className="text-muted-foreground">
+                  {new Date(entry.timestamp).toLocaleTimeString()}:
+                </span>
+                <span className="ml-2">{entry.text}</span>
+              </div>
+            ))
+          )}
         </div>
       </CardContent>
     </Card>
