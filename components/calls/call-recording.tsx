@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { PlayIcon, PauseIcon } from "lucide-react";
+import { PlayIcon, PauseIcon, DownloadIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { CallDetails } from "@/types";
 
@@ -16,6 +16,7 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
     call.recordingUrl
   );
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handlePlayPause = async () => {
@@ -45,6 +46,33 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
         description: "Failed to play the recording. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true);
+      const response = await fetch(recordingUrl!);
+      if (!response.ok) throw new Error('Failed to download recording');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `call-recording-${call.id}.wav`; // or .mp3 depending on your format
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download Error",
+        description: "Failed to download the recording. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -104,6 +132,15 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
             <span className="text-sm text-muted-foreground">
               {isPlaying ? "Playing" : "Paused"}
             </span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="h-8 w-8 ml-2"
+            >
+              <DownloadIcon className="h-4 w-4" />
+            </Button>
           </div>
         )}
         <div className="h-[300px] overflow-y-auto space-y-2">
