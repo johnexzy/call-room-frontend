@@ -52,14 +52,18 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      const response = await fetch(recordingUrl!);
+      const response = await apiClient.get(
+        `/calls/${call.id}/recording/download-wav`,
+        { responseType: 'blob' }
+      );
+      
       if (!response.ok) throw new Error('Failed to download recording');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `call-recording-${call.id}.wav`; // or .mp3 depending on your format
+      a.download = `call-recording-${call.id}.wav`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

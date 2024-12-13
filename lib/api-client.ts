@@ -57,6 +57,7 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 
 interface FetchOptions extends RequestInit {
   headers?: Record<string, string>;
+  responseType?: string;
 }
 
 export const apiClient = {
