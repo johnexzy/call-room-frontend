@@ -84,12 +84,9 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
       setRecordingState((prev) => ({ ...prev, error: null }));
 
       const response = await axiosClient.get<Blob>(
-        `/calls/${call.id}/recording`,
+        `/calls/${call.id}/recording?download=true`,
         {
           responseType: "blob",
-          params: {
-            download: "true",
-          },
         }
       );
 
