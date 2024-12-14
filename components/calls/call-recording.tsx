@@ -6,6 +6,7 @@ import { PlayIcon, PauseIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { CallDetails } from "@/types";
 import { Spinner } from "@/components/ui/spinner";
+import { Progress } from "@/components/ui/progress";
 
 interface CallRecordingProps {
   call: CallDetails;
@@ -15,6 +16,11 @@ interface RecordingState {
   url: string | null;
   isLoading: boolean;
   error: string | null;
+}
+
+interface DownloadProgressEvent {
+  loaded: number;
+  total?: number;
 }
 
 export function CallRecording({ call }: Readonly<CallRecordingProps>) {
@@ -27,10 +33,10 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Update URL when call prop changes
     setRecordingState((prev) => ({ ...prev, url: call.recordingUrl }));
   }, [call.recordingUrl]);
 
@@ -81,28 +87,41 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
+      setDownloadProgress(0);
       setRecordingState((prev) => ({ ...prev, error: null }));
 
       const response = await axiosClient.get<Blob>(
         `/calls/${call.id}/recording?download=true`,
         {
           responseType: "blob",
+          onDownloadProgress: (progressEvent: DownloadProgressEvent) => {
+            const progress = progressEvent.total
+              ? (progressEvent.loaded / progressEvent.total) * 100
+              : 0;
+            setDownloadProgress(progress);
+          },
         }
       );
 
-      const blob = new Blob([response.data as BlobPart], { type: "audio/wav" });
+      // Create blob from response
+      const blob = new Blob([response.data], { type: "audio/wav" });
       const url = window.URL.createObjectURL(blob);
+
+      // Create download link
       const a = document.createElement("a");
       a.href = url;
       a.download = `call-recording-${call.id}.wav`;
       document.body.appendChild(a);
       a.click();
+
+      // Cleanup
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
       handleError(error, "Download");
     } finally {
       setIsDownloading(false);
+      setDownloadProgress(0);
     }
   };
 
@@ -177,19 +196,29 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
             <span className="text-sm text-muted-foreground min-w-[60px]">
               {isLoading ? "Loading..." : isPlaying ? "Playing" : "Paused"}
             </span>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleDownload}
-              disabled={isLoading}
-              className="h-8 w-8"
-            >
-              {isDownloading ? (
-                <Spinner className="h-4 w-4" />
-              ) : (
-                <DownloadIcon className="h-4 w-4" />
+            <div className="flex items-center gap-2 flex-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleDownload}
+                disabled={isLoading}
+                className="h-8 w-8"
+              >
+                {isDownloading ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <DownloadIcon className="h-4 w-4" />
+                )}
+              </Button>
+              {isDownloading && (
+                <div className="flex-1">
+                  <Progress value={downloadProgress} className="h-2" />
+                  <span className="text-xs text-muted-foreground">
+                    {Math.round(downloadProgress)}%
+                  </span>
+                </div>
               )}
-            </Button>
+            </div>
             <Button
               variant="outline"
               size="icon"
