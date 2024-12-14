@@ -90,24 +90,62 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
       setDownloadProgress(0);
       setRecordingState((prev) => ({ ...prev, error: null }));
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
+
       const response = await axiosClient.get<Blob>(
         `/calls/${call.id}/recording?download=true`,
         {
           responseType: "blob",
           onDownloadProgress: (progressEvent: DownloadProgressEvent) => {
             const progress = progressEvent.total
-              ? (progressEvent.loaded / progressEvent.total) * 100
+              ? Math.round((progressEvent.loaded / progressEvent.total) * 100)
               : 0;
             setDownloadProgress(progress);
+
+            // Update download status message
+            const downloaded = (progressEvent.loaded / (1024 * 1024)).toFixed(
+              2
+            );
+            const total = progressEvent.total
+              ? (progressEvent.total / (1024 * 1024)).toFixed(2)
+              : "unknown";
+            toast({
+              title: "Downloading...",
+              description: `${downloaded}MB of ${total}MB (${progress}%)`,
+              duration: 2000,
+            });
+          },
+          timeout: 600000, // 10 minutes timeout
+          signal: controller.signal,
+          headers: {
+            Accept: "audio/wav",
+            "Cache-Control": "no-cache",
           },
         }
       );
 
+      clearTimeout(timeoutId);
+
+      // Validate response
+      if (!response.data) {
+        throw new Error("No data received from server");
+      }
+
       // Create blob from response
       const blob = new Blob([response.data], { type: "audio/wav" });
-      const url = window.URL.createObjectURL(blob);
 
-      // Create download link
+      // Validate blob size
+      if (blob.size === 0) {
+        throw new Error("Downloaded file is empty");
+      }
+
+      // Log file size
+      const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+      console.log(`Downloaded file size: ${fileSizeMB}MB`);
+
+      // Create and trigger download
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `call-recording-${call.id}.wav`;
@@ -115,10 +153,34 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
       a.click();
 
       // Cleanup
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
+
+      toast({
+        title: "Success",
+        description: `Recording (${fileSizeMB}MB) downloaded successfully`,
+      });
     } catch (error) {
       handleError(error, "Download");
+
+      // More detailed error handling
+      let errorMessage = "Please try refreshing the URL and downloading again";
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          errorMessage = "Download timed out. Please try again.";
+        } else if (error.message.includes("network")) {
+          errorMessage =
+            "Network error. Please check your connection and try again.";
+        }
+      }
+
+      toast({
+        title: "Download Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setIsDownloading(false);
       setDownloadProgress(0);
