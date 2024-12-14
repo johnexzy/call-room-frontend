@@ -41,10 +41,6 @@ export default function CallDetailsPage() {
     return <div>Loading...</div>;
   }
 
-  const getCallContext = () => {
-    return call.transcripts.map((t) => `${t.speaker}: ${t.text}`).join("\n");
-  };
-
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -95,7 +91,7 @@ export default function CallDetailsPage() {
         </TabsContent>
 
         <TabsContent value="suggestions">
-          <NextSteps context={getCallContext()} />
+          <NextSteps callId={call.id} />
         </TabsContent>
 
         <TabsContent value="recording">

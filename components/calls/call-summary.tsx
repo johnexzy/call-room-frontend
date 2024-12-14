@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api-client";
 import { RefreshCw } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface CallSummaryProps {
   callId: string;
@@ -17,16 +18,17 @@ interface SummaryData {
   keyPoints: string[];
   actionItems: string[];
   customerSentiment: 'positive' | 'negative' | 'neutral';
+  generatedAt?: Date;
 }
 
 export function CallSummary({ callId }: CallSummaryProps) {
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const loadSummary = async () => {
+  const loadSummary = async (refresh = false) => {
     setIsLoading(true);
     try {
-      const response = await apiClient.post(`/ai/calls/${callId}/summary`, {});
+      const response = await apiClient.post(`/ai/calls/${callId}/summary${refresh ? '?refresh=true' : ''}`);
       if (response.ok) {
         const data = await response.json();
         setSummary(data);
@@ -85,13 +87,21 @@ export function CallSummary({ callId }: CallSummaryProps) {
             <Badge className={getSentimentColor(summary.customerSentiment)}>
               {summary.customerSentiment.charAt(0).toUpperCase() + summary.customerSentiment.slice(1)}
             </Badge>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={loadSummary}
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {summary.generatedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Generated {formatDistanceToNow(new Date(summary.generatedAt), { addSuffix: true })}
+                </span>
+              )}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => loadSummary(true)}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
         </CardTitle>
       </CardHeader>
