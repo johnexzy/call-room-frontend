@@ -1,0 +1,13 @@
+[
+  {
+    "origin": ["https://call-room.vercel.app", "http://localhost:3344"],
+    "method": ["GET", "HEAD"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "Content-Range",
+      "Content-Disposition"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

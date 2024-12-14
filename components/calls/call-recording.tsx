@@ -18,9 +18,12 @@ interface RecordingState {
   error: string | null;
 }
 
-interface DownloadProgressEvent {
-  loaded: number;
-  total?: number;
+
+interface RecordingResponse {
+  url: string;
+  filename: string;
+  contentType: string;
+  isDownload: boolean;
 }
 
 export function CallRecording({ call }: Readonly<CallRecordingProps>) {
@@ -90,65 +93,83 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
       setDownloadProgress(0);
       setRecordingState((prev) => ({ ...prev, error: null }));
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
+      // Get the direct download URL
+      const response = await axiosClient.get<RecordingResponse>(
+        `/calls/${call.id}/recording?download=true&longLived=true`
+      );
 
-      const response = await axiosClient.get<Blob>(
-        `/calls/${call.id}/recording?download=true`,
-        {
-          responseType: "blob",
-          onDownloadProgress: (progressEvent: DownloadProgressEvent) => {
-            const progress = progressEvent.total
-              ? Math.round((progressEvent.loaded / progressEvent.total) * 100)
-              : 0;
+      if (!response.data?.url) {
+        throw new Error("No download URL received");
+      }
+
+      // Start the download using the direct URL
+      const downloadResponse = await fetch(response.data.url, {
+        headers: {
+          Accept: response.data.contentType,
+        },
+      });
+
+      if (!downloadResponse.ok) {
+        throw new Error(`Failed to download: ${downloadResponse.statusText}`);
+      }
+
+      // Get the total size for progress calculation
+      const totalBytes = parseInt(
+        downloadResponse.headers.get("content-length") || "0",
+        10
+      );
+      let downloadedBytes = 0;
+
+      // Create a ReadableStream from the response
+      const reader = downloadResponse.body?.getReader();
+      if (!reader) {
+        throw new Error("Failed to initialize download stream");
+      }
+
+      // Create an array to store chunks
+      const chunks: Uint8Array[] = [];
+
+      // Process the stream
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        if (value) {
+          chunks.push(value);
+          downloadedBytes += value.length;
+
+          // Calculate and update progress
+          if (totalBytes > 0) {
+            const progress = Math.round((downloadedBytes / totalBytes) * 100);
             setDownloadProgress(progress);
 
             // Update download status message
-            const downloaded = (progressEvent.loaded / (1024 * 1024)).toFixed(
-              2
-            );
-            const total = progressEvent.total
-              ? (progressEvent.total / (1024 * 1024)).toFixed(2)
-              : "unknown";
+            const downloaded = (downloadedBytes / (1024 * 1024)).toFixed(2);
+            const total = (totalBytes / (1024 * 1024)).toFixed(2);
             toast({
               title: "Downloading...",
               description: `${downloaded}MB of ${total}MB (${progress}%)`,
               duration: 2000,
             });
-          },
-          timeout: 600000, // 10 minutes timeout
-          signal: controller.signal,
-          headers: {
-            Accept: "audio/wav",
-            "Cache-Control": "no-cache",
-          },
+          }
         }
-      );
-
-      clearTimeout(timeoutId);
-
-      // Validate response
-      if (!response.data) {
-        throw new Error("No data received from server");
       }
 
-      // Create blob from response
-      const blob = new Blob([response.data], { type: "audio/wav" });
-
-      // Validate blob size
-      if (blob.size === 0) {
-        throw new Error("Downloaded file is empty");
+      // Combine chunks into a single Uint8Array
+      const allChunks = new Uint8Array(downloadedBytes);
+      let position = 0;
+      for (const chunk of chunks) {
+        allChunks.set(chunk, position);
+        position += chunk.length;
       }
 
-      // Log file size
-      const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
-      console.log(`Downloaded file size: ${fileSizeMB}MB`);
-
-      // Create and trigger download
+      // Create blob and trigger download
+      const blob = new Blob([allChunks], { type: response.data.contentType });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `call-recording-${call.id}.wav`;
+      a.download = response.data.filename;
       document.body.appendChild(a);
       a.click();
 
@@ -158,6 +179,7 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
         document.body.removeChild(a);
       }, 100);
 
+      const fileSizeMB = (downloadedBytes / (1024 * 1024)).toFixed(2);
       toast({
         title: "Success",
         description: `Recording (${fileSizeMB}MB) downloaded successfully`,
