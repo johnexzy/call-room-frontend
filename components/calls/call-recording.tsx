@@ -104,8 +104,10 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
             setDownloadProgress(progress);
 
             // Update download status message
-            const downloaded = (progressEvent.loaded / (1024 * 1024)).toFixed(2);
-            const total = progressEvent.total 
+            const downloaded = (progressEvent.loaded / (1024 * 1024)).toFixed(
+              2
+            );
+            const total = progressEvent.total
               ? (progressEvent.total / (1024 * 1024)).toFixed(2)
               : "unknown";
             toast({
@@ -117,8 +119,8 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
           timeout: 600000, // 10 minutes timeout
           signal: controller.signal,
           headers: {
-            'Accept': 'audio/wav',
-            'Cache-Control': 'no-cache',
+            Accept: "audio/wav",
+            "Cache-Control": "no-cache",
           },
         }
       );
@@ -132,7 +134,7 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
 
       // Create blob from response
       const blob = new Blob([response.data], { type: "audio/wav" });
-      
+
       // Validate blob size
       if (blob.size === 0) {
         throw new Error("Downloaded file is empty");
@@ -140,7 +142,7 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
 
       // Log file size
       const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
-      this.logger?.log(`Downloaded file size: ${fileSizeMB}MB`);
+      console.log(`Downloaded file size: ${fileSizeMB}MB`);
 
       // Create and trigger download
       const url = window.URL.createObjectURL(blob);
@@ -162,17 +164,18 @@ export function CallRecording({ call }: Readonly<CallRecordingProps>) {
       });
     } catch (error) {
       handleError(error, "Download");
-      
+
       // More detailed error handling
       let errorMessage = "Please try refreshing the URL and downloading again";
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
+        if (error.name === "AbortError") {
           errorMessage = "Download timed out. Please try again.";
-        } else if (error.message.includes('network')) {
-          errorMessage = "Network error. Please check your connection and try again.";
+        } else if (error.message.includes("network")) {
+          errorMessage =
+            "Network error. Please check your connection and try again.";
         }
       }
-      
+
       toast({
         title: "Download Failed",
         description: errorMessage,
