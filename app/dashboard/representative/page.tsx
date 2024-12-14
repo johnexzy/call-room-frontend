@@ -13,8 +13,6 @@ import { NetworkStats } from "@/components/calls/network-stats";
 import { CallNotes } from "@/components/calls/call-notes";
 import { JourneyTimeline } from "@/components/customer/journey-timeline";
 import { KnowledgeBase } from "@/components/knowledge/knowledge-base";
-import { CallSummary } from "@/components/calls/call-summary";
-import { NextSteps } from "@/components/calls/next-steps";
 import dynamic from "next/dist/shared/lib/dynamic";
 
 const CallInterface = dynamic(
@@ -194,13 +192,6 @@ export default function RepresentativeDashboard() {
                 <SentimentAnalyzer callId={currentCall.id} />
                 <NetworkStats callId={currentCall.id} />
               </div>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <CallSummary callId={currentCall.id} />
-              <NextSteps
-                context={`Customer: ${currentCall.customer.firstName} ${currentCall.customer.lastName}`}
-              />
             </div>
 
             <JourneyTimeline customerId={currentCall.customer.id} />
