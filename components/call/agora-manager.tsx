@@ -10,24 +10,31 @@ import {
   useClientEvent,
 } from "agora-rtc-react";
 import {
+  ILocalAudioTrack,
+  IRemoteAudioTrack,
+  IAgoraRTCRemoteUser,
+  UID,
+} from "agora-rtc-sdk-ng";
+import {
   useState,
   useCallback,
   createContext,
   useMemo,
   useContext,
   useEffect,
+  useRef,
 } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, MicOff, PhoneOff } from "lucide-react";
 import { JoinConfig } from "@/types";
-import { IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import { Badge } from "@/components/ui/badge";
 import { axiosClient } from "@/lib/api-client";
+import { AudioProcessor } from "@/lib/audio-processor";
 
 interface AgoraContextType {
-  localMicrophoneTrack: IMicrophoneAudioTrack | null;
+  localMicrophoneTrack: ILocalAudioTrack | null;
   children: React.ReactNode;
 }
 
@@ -35,6 +42,7 @@ interface AgoraManagerProps {
   callId: string;
   isRep: boolean;
   onCallEnd?: () => void;
+  onTranscriptReceived?: (userId: string, transcript: string) => void;
   joinConfig: JoinConfig;
 }
 const AgoraContext = createContext<AgoraContextType | null>(null);
@@ -64,6 +72,7 @@ export const useAgoraContext = () => {
 export function AgoraManager({
   callId,
   onCallEnd,
+  onTranscriptReceived,
   joinConfig,
   isRep,
 }: Readonly<AgoraManagerProps>) {
@@ -71,16 +80,19 @@ export function AgoraManager({
 
   const { toast } = useToast();
 
-  //   agoraEngine.enableAudioVolumeIndicator();
-
   const { localMicrophoneTrack } = useLocalMicrophoneTrack();
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<
+    { uid: UID; name: string }[]
+  >([]);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordingResourceId, setRecordingResourceId] = useState<string | null>(null);
+  const [recordingResourceId, setRecordingResourceId] = useState<string | null>(
+    null
+  );
   const [recordingSid, setRecordingSid] = useState<string | null>(null);
+  const audioProcessors = useRef<Map<string, AudioProcessor>>(new Map());
 
   const remoteUsers = useRemoteUsers();
 
@@ -90,18 +102,129 @@ export function AgoraManager({
     ...joinConfig,
   });
 
-  useClientEvent(agoraEngine, "user-joined", (user) => {
+  const initializeAudioProcessor = useCallback(
+    async (userId: string, track: ILocalAudioTrack | IRemoteAudioTrack) => {
+      try {
+        const processor = new AudioProcessor(
+          `${callId}-${userId}`,
+          callId,
+          userId
+        );
+        await processor.init();
+        await processor.processTrack(track);
+
+        processor.onTranscript((transcript) => {
+          onTranscriptReceived?.(userId, transcript);
+        });
+
+        audioProcessors.current.set(String(userId), processor);
+      } catch (error) {
+        console.error("Failed to initialize audio processor:", error);
+      }
+    },
+    [callId, onTranscriptReceived]
+  );
+
+  const handleRemoteTrack = useCallback(
+    async (user: IAgoraRTCRemoteUser) => {
+      if (!isConnected) return;
+
+      const audioTrack = user.audioTrack;
+      if (!audioTrack) return;
+
+      try {
+        await initializeAudioProcessor(String(user.uid), audioTrack);
+      } catch (error) {
+        console.error(
+          `Failed to initialize remote audio processor for user ${user.uid}:`,
+          error
+        );
+      }
+    },
+    [isConnected, initializeAudioProcessor]
+  );
+
+  // Initialize audio processing for local track
+  useEffect(() => {
+    if (!localMicrophoneTrack || !isConnected) return;
+
+    const initLocalAudioProcessor = async () => {
+      try {
+        await initializeAudioProcessor("local", localMicrophoneTrack);
+      } catch (error) {
+        console.error("Failed to initialize local audio processor:", error);
+        toast({
+          title: "Error",
+          description: "Failed to initialize audio processing",
+          variant: "destructive",
+        });
+      }
+    };
+
+    initLocalAudioProcessor();
+
+    return () => {
+      const processor = audioProcessors.current.get("local");
+      if (processor) {
+        processor.stopProcessing();
+        audioProcessors.current.delete("local");
+      }
+    };
+  }, [localMicrophoneTrack, isConnected, initializeAudioProcessor, toast]);
+
+  // Handle remote users' audio tracks
+  useEffect(() => {
+    if (!isConnected) return;
+
+    remoteUsers.forEach((user) => {
+      handleRemoteTrack(user).catch((error) => {
+        console.error(
+          `Failed to handle remote track for user ${user.uid}:`,
+          error
+        );
+      });
+    });
+
+    return () => {
+      remoteUsers.forEach((user) => {
+        const processor = audioProcessors.current.get(String(user.uid));
+        if (processor) {
+          processor.stopProcessing();
+          audioProcessors.current.delete(String(user.uid));
+        }
+      });
+    };
+  }, [remoteUsers, handleRemoteTrack, isConnected]);
+
+  useClientEvent(agoraEngine, "user-joined", (user: IAgoraRTCRemoteUser) => {
     setParticipants((prevParticipants) => [
       ...prevParticipants,
       { uid: user.uid, name: `User ${user.uid}` },
     ]);
   });
 
-  useClientEvent(agoraEngine, "user-left", (user) => {
+  useClientEvent(agoraEngine, "user-left", (user: IAgoraRTCRemoteUser) => {
     setParticipants((prevParticipants) =>
       prevParticipants.filter((participant) => participant.uid !== user.uid)
     );
   });
+
+  useClientEvent(
+    agoraEngine,
+    "user-published",
+    (user: IAgoraRTCRemoteUser, mediaType: "audio" | "video") => {
+      console.log(
+        "The user",
+        user.uid,
+        "has published",
+        mediaType,
+        "in the channel"
+      );
+      if (mediaType === "audio") {
+        void handleRemoteTrack(user);
+      }
+    }
+  );
 
   const toggleMute = () => {
     if (localMicrophoneTrack) {
@@ -142,10 +265,6 @@ export function AgoraManager({
         console.log(`${volume.uid} is speaking`);
       }
     });
-  });
-
-  useClientEvent(agoraEngine, "user-published", (user) => {
-    console.log("The user", user.uid, " has published media in the channel");
   });
 
   useEffect(() => {

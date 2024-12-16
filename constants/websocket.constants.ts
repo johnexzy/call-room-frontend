@@ -3,6 +3,7 @@ export const WS_NAMESPACES = {
   NOTIFICATIONS: 'notifications',
   ANALYTICS: 'analytics',
   QUEUE: 'queue',
+  TRANSCRIPTION: 'transcription',
 } as const;
 
 export const WS_EVENTS = {
@@ -23,4 +24,10 @@ export const WS_EVENTS = {
     POSITION_UPDATE: 'position_update',
     YOUR_TURN: 'your_turn',
   },
-} as const; 
+  TRANSCRIPTION: {
+    TRANSCRIPTION_UPDATE: 'transcription:update',
+    AUDIO_DATA: 'transcription:audio_data',
+    ERROR: 'transcription:error',
+    TRANSCRIPT: 'transcription:transcript',
+  },
+} as const;

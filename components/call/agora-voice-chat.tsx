@@ -3,7 +3,6 @@
 import {
   AgoraRTCProvider,
   useClientEvent,
-//   useRTCClient,
 } from "agora-rtc-react";
 import AgoraRTC from "agora-rtc-sdk-ng";
 import { AgoraManager } from "./agora-manager";
@@ -15,6 +14,7 @@ interface AgoraVoiceChatProps {
   userId: string;
   isRep: boolean;
   onCallEnd?: () => void;
+  onTranscriptReceived?: (userId: string, transcript: string) => void;
   joinConfig: JoinConfig;
 }
 
@@ -23,6 +23,7 @@ export function AgoraVoiceChat({
   isRep,
   userId,
   onCallEnd,
+  onTranscriptReceived,
   joinConfig,
 }: Readonly<AgoraVoiceChatProps>) {
   const agoraEngine = useMemo(() => {
@@ -37,6 +38,7 @@ export function AgoraVoiceChat({
       onCallEnd?.();
     }
   });
+  
 
   return (
     <AgoraRTCProvider client={agoraEngine}>
@@ -44,6 +46,7 @@ export function AgoraVoiceChat({
         callId={callId}
         isRep={isRep}
         onCallEnd={onCallEnd}
+        onTranscriptReceived={onTranscriptReceived}
         joinConfig={joinConfig}
       />
     </AgoraRTCProvider>
