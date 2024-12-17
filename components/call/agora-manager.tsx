@@ -244,6 +244,13 @@ export function AgoraManager({
       if (isRecording) {
         await handleStopRecording();
       }
+
+      // Stop all audio processors
+      audioProcessors.current.forEach((processor) => {
+        processor.stopProcessing();
+      });
+      audioProcessors.current.clear();
+
       if (localMicrophoneTrack) {
         localMicrophoneTrack.close();
       }

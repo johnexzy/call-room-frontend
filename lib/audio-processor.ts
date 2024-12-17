@@ -45,19 +45,23 @@ export class AudioProcessor {
       throw new Error('API URL not configured');
     }
 
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
     this.socket = io(`${process.env.NEXT_PUBLIC_WS_URL}/${WS_NAMESPACES.TRANSCRIPTION}`, {
-        auth: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      auth: {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-        query: {
-          sessionId: this.sessionId,
-        },
-        transports: ["websocket"],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
+      },
+      query: {
+        sessionId: this.sessionId,
+      },
+      transports: ["websocket"],
+      reconnection: false,
     });
 
     this.socket.on('connect', () => {
@@ -67,10 +71,16 @@ export class AudioProcessor {
 
     this.socket.on('disconnect', () => {
       console.log('Disconnected from transcription server');
+      if (this.isProcessing) {
+        this.stopProcessing().catch(console.error);
+      }
     });
 
     this.socket.on(WS_EVENTS.TRANSCRIPTION.ERROR, (error: Error) => {
       console.error('Transcription error:', error);
+      if (this.isProcessing) {
+        this.stopProcessing().catch(console.error);
+      }
     });
   }
 
@@ -88,17 +98,21 @@ export class AudioProcessor {
       this.audioWorklet = new AudioWorkletNode(this.audioContext, 'audio-processor');
 
       this.audioWorklet.port.onmessage = async (event) => {
-        try {
-          if (!this.isProcessing || !this.socket) return;
+        if (!this.isProcessing || !this.socket || !this.audioWorklet) {
+          return;
+        }
 
+        try {
           const audioData = event.data;
           const base64Data = this.float32ArrayToBase64(audioData);
           
-          this.socket.emit(WS_EVENTS.TRANSCRIPTION.AUDIO_DATA, {
-            callId: this.callId,
-            audioData: base64Data,
-            userId: String(this.userId),
-          });
+          if (this.isProcessing && this.socket) {
+            this.socket.emit(WS_EVENTS.TRANSCRIPTION.AUDIO_DATA, {
+              callId: this.callId,
+              audioData: base64Data,
+              userId: String(this.userId),
+            });
+          }
 
           this.retryCount = 0;
         } catch (error) {
@@ -113,8 +127,10 @@ export class AudioProcessor {
         }
       };
 
-      this.sourceNode.connect(this.audioWorklet);
-      this.audioWorklet.connect(this.audioContext.destination);
+      if (this.isProcessing) {
+        this.sourceNode.connect(this.audioWorklet);
+        this.audioWorklet.connect(this.audioContext.destination);
+      }
 
       this.audioContext.onstatechange = async () => {
         if (this.audioContext.state === 'suspended' && this.isProcessing) {
@@ -155,21 +171,26 @@ export class AudioProcessor {
     
     if (this.audioWorklet) {
       this.audioWorklet.port.onmessage = null;
-      this.audioWorklet.disconnect();
+      if (this.audioContext.state !== 'closed') {
+        this.audioWorklet.disconnect();
+      }
       this.audioWorklet = null;
     }
 
     if (this.sourceNode) {
-      this.sourceNode.disconnect();
+      if (this.audioContext.state !== 'closed') {
+        this.sourceNode.disconnect();
+      }
       this.sourceNode = null;
     }
 
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
 
-    if (this.audioContext.state !== 'closed') {
+    if (this.audioContext && this.audioContext.state !== 'closed') {
       try {
         await this.audioContext.close();
       } catch (error) {
