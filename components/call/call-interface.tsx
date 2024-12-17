@@ -11,6 +11,7 @@ interface CallInterfaceProps {
   targetUserId: string;
   isRep: boolean;
   onEndCall?: () => void;
+  onTranscriptReceived?: (userId: string, transcript: string) => void;
 }
 
 
@@ -19,6 +20,7 @@ export default function CallInterface({
   targetUserId,
   isRep,
   onEndCall,
+  onTranscriptReceived,
 }: Readonly<CallInterfaceProps>) {
   const [joinConfig, setJoinConfig] = useState<JoinConfig>();
 
@@ -62,6 +64,7 @@ export default function CallInterface({
           isRep={isRep}
           userId={targetUserId}
           onCallEnd={onEndCall}
+          onTranscriptReceived={onTranscriptReceived}
           joinConfig={joinConfig}
         />
       ) : null}

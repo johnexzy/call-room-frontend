@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -13,16 +13,14 @@ import { NetworkStats } from "@/components/calls/network-stats";
 import { CallNotes } from "@/components/calls/call-notes";
 import { JourneyTimeline } from "@/components/customer/journey-timeline";
 import { KnowledgeBase } from "@/components/knowledge/knowledge-base";
+import { TranscriptDisplay, TranscriptDisplayRef } from "@/components/calls/transcript-display";
 import dynamic from "next/dist/shared/lib/dynamic";
 
 const CallInterface = dynamic(
   () => import("@/components/call/call-interface"),
   { ssr: false }
 );
-// const CallRecorder = dynamic(
-//   () => import("@/components/calls/call-recorder").then((mod) => mod.default),
-//   { ssr: false }
-// );
+
 interface Call {
   id: string;
   customer: {
@@ -40,6 +38,7 @@ export default function RepresentativeDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const socket = useWebSocket(WS_NAMESPACES.CALLS);
   const { toast } = useToast();
+  const transcriptRef = useRef<TranscriptDisplayRef>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -187,17 +186,23 @@ export default function RepresentativeDashboard() {
                 isRep={true}
                 targetUserId={currentCall.customer.id}
                 onEndCall={handleEndCall}
+                onTranscriptReceived={(userId: string, transcript: string) => {
+                  transcriptRef.current?.addTranscript(userId, transcript);
+                }}
               />
               <div className="space-y-6">
                 <SentimentAnalyzer callId={currentCall.id} />
                 <NetworkStats callId={currentCall.id} />
+                <TranscriptDisplay 
+                  ref={transcriptRef}
+                  customerId={currentCall.customer.id} 
+                />
               </div>
             </div>
 
             <JourneyTimeline customerId={currentCall.customer.id} />
 
             <div className="grid gap-6 md:grid-cols-2">
-              {/* <CallRecorder callId={currentCall.id} isActive={true} /> */}
               <CallNotes callId={currentCall.id} isActive={true} />
             </div>
           </div>
