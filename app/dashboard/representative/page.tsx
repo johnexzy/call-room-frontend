@@ -195,7 +195,9 @@ export default function RepresentativeDashboard() {
                 <NetworkStats callId={currentCall.id} />
                 <TranscriptDisplay 
                   ref={transcriptRef}
-                  customerId={currentCall.customer.id} 
+                  customerId={currentCall.customer.id}
+                  customerName={`${currentCall.customer.firstName} ${currentCall.customer.lastName}`}
+                  repName="Support Agent"
                 />
               </div>
             </div>
