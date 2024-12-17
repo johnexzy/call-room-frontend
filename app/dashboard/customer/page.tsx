@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 import { WS_NAMESPACES, WS_EVENTS } from "@/constants/websocket.constants";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic.js";
+import { TranscriptDisplayRef } from "@/components/calls/transcript-display";
 
 const CallInterface = dynamic(
   () => import("@/components/call/call-interface"),
@@ -45,32 +46,9 @@ export default function CustomerDashboard() {
   const callSocket = useWebSocket(WS_NAMESPACES.CALLS);
   const { toast } = useToast();
   const [currentCall, setCurrentCall] = useState<Call | null>(null);
+  const transcriptRef = useRef<TranscriptDisplayRef>(null);
 
   useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  const loadInitialData = async () => {
-    try {
-      const [profileResponse] = await Promise.all([
-        apiClient.get("/users/profile"),
-      ]);
-
-      if (profileResponse.ok) {
-        const profile = await profileResponse.json();
-        console.log("profile", profile);
-      }
-    } catch (error) {
-      console.error("Failed to load initial data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive",
-      });
-    }
-  };
-  useEffect(() => {
-
     if (!queueSocket.socket) return;
 
     queueSocket.socket.on(WS_EVENTS.QUEUE.POSITION_UPDATE, (data) => {
@@ -161,7 +139,6 @@ export default function CustomerDashboard() {
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-bold mb-8">Customer Service</h1>
-
       {currentCall ? (
         <div className="space-y-4">
           <Card>
@@ -173,12 +150,17 @@ export default function CustomerDashboard() {
               </CardDescription>
             </CardHeader>
           </Card>
-          <CallInterface
-            callId={currentCall.id}
-            isRep={false}
-            targetUserId={currentCall.representative.id}
-            onEndCall={handleEndCall}
-          />
+          <div className="grid gap-6 md:grid-cols-2">
+            <CallInterface
+              callId={currentCall.id}
+              isRep={false}
+              targetUserId={currentCall.representative.id}
+              onEndCall={handleEndCall}
+              onTranscriptReceived={(userId: string, transcript: string) => {
+                transcriptRef.current?.addTranscript(userId, transcript);
+              }}
+            />
+          </div>
         </div>
       ) : !isInQueue ? (
         <Card>
